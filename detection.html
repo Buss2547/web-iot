@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detection — Security</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --peach: #f5c9a8;
+    --peach-dark: #e8b48a;
+    --bg: #f7f1e9;
+    --card: #ffffff;
+    --text: #1a1a1a;
+    --muted: #6b6b6b;
+    --border: #e8e0d5;
+    --green: #2e7d32;
+    --red: #c62828;
+    --orange: #e67e22;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ===== TOP BAR ===== */
+  .topbar {
+    background: var(--peach);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 32px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #111;
+    text-decoration: none;
+  }
+  .nav-pills {
+    display: flex;
+    background: rgba(255,255,255,0.55);
+    border-radius: 999px;
+    padding: 4px;
+    gap: 2px;
+  }
+  .nav-pills a {
+    text-decoration: none;
+    color: #333;
+    font-size: 0.9rem;
+    font-weight: 500;
+    padding: 8px 20px;
+    border-radius: 999px;
+    transition: all 0.15s;
+  }
+  .nav-pills a.active,
+  .nav-pills a:hover {
+    background: #fff;
+    color: #111;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .login-btn {
+    background: #fff;
+    border: none;
+    border-radius: 999px;
+    padding: 9px 22px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    text-decoration: none;
+    color: #111;
+  }
+  .login-btn:hover { background: #fafafa; }
+
+  /* ===== MAIN ===== */
+  .wrap {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 36px 32px 60px;
+  }
+
+  .heading-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 32px;
+  }
+  .eyebrow {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 6px;
+  }
+  .heading-row h1 {
+    font-size: 2.6rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+  }
+  .heading-row p {
+    color: var(--muted);
+    margin-top: 6px;
+    font-size: 0.95rem;
+  }
+  .system-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .system-status .dot {
+    width: 8px;
+    height: 8px;
+    background: #4caf50;
+    border-radius: 50%;
+  }
+
+  /* ===== STATS ===== */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px 24px;
+  }
+  .stat-card b {
+    display: block;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+  }
+  .stat-card span {
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  /* ===== CAMERA + RECENT ===== */
+  .camera-grid {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 20px;
+  }
+
+  .camera-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .camera-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .live-badge {
+    color: var(--red);
+    font-size: 0.8rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .live-badge::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    background: var(--red);
+    border-radius: 50%;
+  }
+
+  .camera-feed {
+    background: #1a1a1a;
+    height: 380px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+    font-size: 0.9rem;
+    letter-spacing: 0.04em;
+  }
+  .face-box {
+    position: absolute;
+    width: 140px;
+    height: 160px;
+    border: 2px solid var(--peach);
+    border-radius: 4px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 8px;
+  }
+  .face-box span {
+    background: var(--peach);
+    color: #111;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 3px;
+    letter-spacing: 0.03em;
+  }
+
+  /* Recent Visitors */
+  .recent-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px;
+  }
+  .recent-panel h2 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin-bottom: 20px;
+  }
+  .visitor {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .visitor:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+  .avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--peach);
+    color: #111;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+  }
+  .avatar.unknown {
+    background: #eee;
+    color: #888;
+  }
+  .visitor-info {
+    flex: 1;
+  }
+  .visitor-info b {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .visitor-info small {
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+  .badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+  .badge.known {
+    color: var(--green);
+  }
+  .badge.unknown {
+    color: var(--red);
+  }
+
+  @media (max-width: 900px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .camera-grid { grid-template-columns: 1fr; }
+    .camera-feed { height: 280px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="logo" href="detection.html">SECURITY</a>
+
+  <nav class="nav-pills">
+    <a class="active" href="detection.html">Detection</a>
+    <a href="training.html">Training</a>
+    <a href="alerts.html">Alerts</a>
+  </nav>
+
+  <a class="login-btn" href="login.html">LOGIN</a>
+</header>
+
+<main class="wrap">
+  <section class="heading-row">
+    <div>
+      <span class="eyebrow">VIGIL SYSTEM</span>
+      <h1>DETECTION</h1>
+      <p>Live visitor monitoring and recognition.</p>
+    </div>
+    <div class="system-status">
+      <span class="dot"></span> SYSTEM ONLINE
+    </div>
+  </section>
+
+  <!-- Stats -->
+  <section class="stats">
+    <div class="stat-card">
+      <b>04</b>
+      <span>Visitors Today</span>
+    </div>
+    <div class="stat-card">
+      <b>02</b>
+      <span>Recognized</span>
+    </div>
+    <div class="stat-card">
+      <b>01</b>
+      <span>Unknown</span>
+    </div>
+    <div class="stat-card">
+      <b>00</b>
+      <span>Active Threats</span>
+    </div>
+  </section>
+
+  <!-- Camera + Recent -->
+  <section class="camera-grid">
+    <div class="camera-panel">
+      <div class="camera-top">
+        <b>CAMERA 01 — ENTRANCE</b>
+        <span class="live-badge">LIVE</span>
+      </div>
+      <div class="camera-feed">
+        <div class="face-box">
+          <span>FACE DETECTED</span>
+        </div>
+        LIVE CAMERA FEED
+      </div>
+    </div>
+
+    <div class="recent-panel">
+      <h2>RECENT VISITORS</h2>
+
+      <div class="visitor">
+        <span class="avatar">JD</span>
+        <div class="visitor-info">
+          <b>John Doe</b>
+          <small>Recognized · 14:32</small>
+        </div>
+        <strong class="badge known">KNOWN</strong>
+      </div>
+
+      <div class="visitor">
+        <span class="avatar unknown">?</span>
+        <div class="visitor-info">
+          <b>Unknown Visitor</b>
+          <small>Detected · 14:38</small>
+        </div>
+        <strong class="badge unknown">UNKNOWN</strong>
+      </div>
+
+      <div class="visitor">
+        <span class="avatar">AS</span>
+        <div class="visitor-info">
+          <b>Alex Smith</b>
+          <small>Recognized · 14:41</small>
+        </div>
+        <strong class="badge known">KNOWN</strong>
+      </div>
+    </div>
+  </section>
+</main>
+
+</body>
+</html>
