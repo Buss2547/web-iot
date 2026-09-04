@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme {
+  --color-vigil-peach: #f5c9a8;
+  --color-vigil-peach-dark: #e8b48a;
+  --color-vigil-bg: #f7f1e9;
+  --color-vigil-card: #ffffff;
+  --color-vigil-text: #1a1a1a;
+  --color-vigil-muted: #6b6b6b;
+  --color-vigil-border: #e8e0d5;
+
+  --color-vigil-green: #2e7d32;
+  --color-vigil-green-bg: #e8f5e9;
+  --color-vigil-red: #c62828;
+  --color-vigil-red-bg: #ffebee;
+  --color-vigil-cyan: #26a69a;
+  --color-vigil-cyan-bg: #e0f2f1;
+  --color-vigil-yellow: #f9a825;
+  --color-vigil-yellow-bg: #fff8e1;
+}
+
+:root {
+  --bg-primary: #f7f1e9;
+}
+
+body {
+  background-color: #f7f1e9;
+  color: #1a1a1a;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  margin: 0;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbars for GPU terminal */
+.terminal-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.terminal-scroll::-webkit-scrollbar-track {
+  background: #141414;
+}
+.terminal-scroll::-webkit-scrollbar-thumb {
+  background: #333333;
+  border-radius: 3px;
+}
