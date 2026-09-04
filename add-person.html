@@ -1,469 +1,103 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Register New Person — Security</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --peach: #f5c9a8;
-    --peach-dark: #e8b48a;
-    --bg: #f7f1e9;
-    --card: #ffffff;
-    --text: #1a1a1a;
-    --muted: #6b6b6b;
-    --border: #e8e0d5;
-    --green: #2e7d32;
-    --red: #c62828;
-    --orange: #e67e22;
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'DM Sans', system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-  }
-
-  /* ===== TOP BAR ===== */
-  .topbar {
-    background: var(--peach);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 32px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  .logo {
-    font-size: 1.35rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    color: #111;
-    text-decoration: none;
-  }
-  .nav-pills {
-    display: flex;
-    background: rgba(255,255,255,0.55);
-    border-radius: 999px;
-    padding: 4px;
-    gap: 2px;
-  }
-  .nav-pills a {
-    text-decoration: none;
-    color: #333;
-    font-size: 0.9rem;
-    font-weight: 500;
-    padding: 8px 20px;
-    border-radius: 999px;
-    transition: all 0.15s;
-  }
-  .nav-pills a.active,
-  .nav-pills a:hover {
-    background: #fff;
-    color: #111;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-  }
-  .login-btn {
-    background: #fff;
-    border: none;
-    border-radius: 999px;
-    padding: 9px 22px;
-    font-weight: 600;
-    font-size: 0.9rem;
-    cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  }
-  .login-btn:hover { background: #fafafa; }
-
-  /* ===== MAIN ===== */
-  .register-wrap {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 36px 32px 60px;
-  }
-
-  .register-heading {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 8px;
-  }
-  .back {
-    width: 42px;
-    height: 42px;
-    border-radius: 12px;
-    background: #fff;
-    border: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-decoration: none;
-    color: #333;
-    font-size: 1.2rem;
-    transition: all 0.15s;
-  }
-  .back:hover {
-    background: #111;
-    color: #fff;
-    border-color: #111;
-  }
-  .register-heading h1 {
-    font-size: 2rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-  }
-  .register-heading p {
-    color: var(--muted);
-    font-size: 0.95rem;
-    margin-top: 4px;
-  }
-
-  .register-line {
-    height: 1px;
-    background: var(--border);
-    margin: 24px 0 32px;
-  }
-
-  /* ===== GRID ===== */
-  .register-grid {
-    display: grid;
-    grid-template-columns: 1fr 1.2fr;
-    gap: 24px;
-    margin-bottom: 32px;
-  }
-
-  .panel {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 28px;
-  }
-  .panel h2 {
-    font-size: 1.1rem;
-    font-weight: 600;
-    margin-bottom: 24px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  .panel h2 span {
-    width: 28px;
-    height: 28px;
-    background: #111;
-    color: #fff;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.85rem;
-    font-weight: 700;
-  }
-
-  label {
-    display: block;
-    font-size: 0.85rem;
-    font-weight: 600;
-    margin-bottom: 8px;
-    color: #333;
-  }
-  input[type="text"],
-  textarea {
-    width: 100%;
-    border: 1px solid var(--border);
-    background: #fafafa;
-    border-radius: 10px;
-    padding: 12px 14px;
-    font-size: 0.95rem;
-    font-family: inherit;
-    outline: none;
-    margin-bottom: 20px;
-    transition: border-color 0.15s;
-  }
-  input[type="text"]:focus,
-  textarea:focus {
-    border-color: var(--peach-dark);
-    background: #fff;
-  }
-  textarea {
-    min-height: 100px;
-    resize: vertical;
-  }
-
-  /* Label buttons */
-  .label-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 20px;
-  }
-  .label-btn {
-    border: 1px solid var(--border);
-    background: #fff;
-    border-radius: 10px;
-    padding: 12px;
-    font-size: 0.9rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  .label-btn:hover {
-    border-color: #111;
-  }
-  .label-btn.active {
-    background: #111;
-    color: #fff;
-    border-color: #111;
-  }
-
-  /* Dataset panel */
-  .dataset-title {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-  }
-  .dataset-title b {
-    font-size: 0.9rem;
-    font-weight: 600;
-  }
-  .dataset-title em {
-    font-style: normal;
-    color: var(--muted);
-    font-weight: 500;
-  }
-
-  .upload-options {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
-    margin-bottom: 20px;
-  }
-  .upload-box {
-    border: 2px dashed var(--border);
-    border-radius: 14px;
-    padding: 28px 16px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.15s;
-    background: #fafafa;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    position: relative;
-  }
-  .upload-box:hover {
-    border-color: var(--peach-dark);
-    background: #fff8f0;
-  }
-  .upload-box strong {
-    font-size: 0.95rem;
-  }
-  .upload-box small {
-    color: var(--muted);
-    font-size: 0.8rem;
-  }
-  .upload-box input[type="file"] {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    cursor: pointer;
-  }
-  .camera-box {
-    border-style: solid;
-    background: #fff;
-  }
-  .camera-box:hover {
-    background: #111;
-    color: #fff;
-    border-color: #111;
-  }
-  .camera-box:hover small {
-    color: #ccc;
-  }
-
-  .image-empty {
-    background: #fafafa;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 32px 20px;
-    text-align: center;
-    color: var(--muted);
-    font-size: 0.9rem;
-    line-height: 1.6;
-  }
-  .image-empty .info {
-    width: 36px;
-    height: 36px;
-    background: #eee;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 12px;
-    font-size: 1.1rem;
-  }
-
-  /* Actions */
-  .register-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-  }
-  .register-actions a {
-    padding: 12px 24px;
-    border-radius: 10px;
-    text-decoration: none;
-    color: #333;
-    font-weight: 600;
-    font-size: 0.95rem;
-    border: 1px solid var(--border);
-    background: #fff;
-  }
-  .register-actions a:hover {
-    background: #f5f5f5;
-  }
-  .save {
-    background: #111;
-    color: #fff;
-    border: none;
-    border-radius: 10px;
-    padding: 12px 28px;
-    font-weight: 600;
-    font-size: 0.95rem;
-    cursor: pointer;
-  }
-  .save:hover {
-    background: #333;
-  }
-
-  @media (max-width: 800px) {
-    .register-grid {
-      grid-template-columns: 1fr;
-    }
-    .upload-options {
-      grid-template-columns: 1fr;
-    }
-  }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register New Person — Vigil Security</title>
+  <meta name="description" content="Register a new authorized or flagged person into the biometric database.">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/add-person.css">
 </head>
 <body>
 
-<header class="topbar">
-  <a class="logo" href="detection.html">SECURITY</a>
+  <!-- Navigation Top Bar -->
+  <header class="topbar">
+    <a class="logo" href="index.html">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      SECURITY
+    </a>
 
-  <nav class="nav-pills">
-    <a href="detection.html">Detection</a>
-    <a class="active" href="training.html">Training</a>
-    <a href="alerts.html">Alerts</a>
-  </nav>
+    <nav class="nav-pills">
+      <a href="detection.html">Detection</a>
+      <a class="active" href="training.html">Training</a>
+      <a href="alerts.html">Alerts</a>
+    </nav>
 
-  <button class="login-btn">LOGIN</button>
-</header>
-
-<main class="register-wrap">
-  <div class="register-heading">
-    <a class="back" href="training.html">←</a>
-    <div>
-      <h1>Register New Person</h1>
-      <p>Upload images and define labels for YOLO training dataset</p>
+    <div class="auth-actions">
+      <a class="login-btn" href="login.html">LOGIN</a>
     </div>
-  </div>
+  </header>
 
-  <div class="register-line"></div>
-
-  <section class="register-grid">
-    <!-- Identity -->
-    <div class="panel identity">
-      <h2><span>1</span> Identity Details</h2>
-
-      <label>Full Name</label>
-      <input id="fullName" type="text" placeholder="e.g. สมชาย วงศ์สว่าง">
-
-      <label>Classification Label</label>
-      <div class="label-grid">
-        <button type="button" class="label-btn active">Employee</button>
-        <button type="button" class="label-btn">Visitor</button>
-        <button type="button" class="label-btn">Family</button>
-        <button type="button" class="label-btn">Blacklist</button>
-      </div>
-
-      <label>Notes / Department (Optional)</label>
-      <textarea placeholder="Additional context about this person..."></textarea>
+  <!-- Main Container -->
+  <main class="register-wrap">
+    <div class="register-heading">
+      <a class="back" href="training.html" title="Back to Training">←</a>
+      <h1>REGISTER NEW PERSON</h1>
     </div>
+    <p class="register-sub">Add identity details and train face recognition embeddings.</p>
 
-    <!-- Dataset -->
-    <div class="panel dataset">
-      <div class="dataset-title">
-        <h2 style="margin:0"><span>2</span> Training Dataset</h2>
-        <b>Images: <em id="imageCount">0 / 15 min</em></b>
+    <section class="register-grid">
+      <!-- 1. Identity Form -->
+      <div class="panel identity">
+        <h2><span>1</span> Identity Details</h2>
+
+        <label for="fullName">Full Name</label>
+        <input id="fullName" type="text" placeholder="e.g. สมชาย วงศ์สว่าง" required>
+
+        <label>Classification Category</label>
+        <div class="label-grid">
+          <button type="button" class="label-btn active">Employee</button>
+          <button type="button" class="label-btn">Visitor</button>
+          <button type="button" class="label-btn">Family</button>
+          <button type="button" class="label-btn">Blacklist</button>
+        </div>
+
+        <label for="notes">Notes / Department (Optional)</label>
+        <textarea id="notes" placeholder="Additional context about this person..."></textarea>
       </div>
 
-      <div class="upload-options">
-        <label class="upload-box">
-          ☁
-          <strong>Upload Images</strong>
-          <small>Drag &amp; drop or click</small>
-          <input id="files" type="file" accept="image/*" multiple>
-        </label>
-        <button class="upload-box camera-box" type="button" onclick="startCamera()">
-          ◉
-          <strong>Capture Live</strong>
-          <small>Use webcam</small>
-        </button>
-      </div>
+      <!-- 2. Training Dataset -->
+      <div class="panel dataset">
+        <div class="dataset-title">
+          <h2><span>2</span> Training Dataset</h2>
+          <b>Images: <em id="imageCount">0 / 15 min</em></b>
+        </div>
 
-      <div class="image-empty" id="preview">
-        <div class="info">ⓘ</div>
-        <p>No images added yet. Add at least 15 varied<br>
-        images (different angles, lighting) for accurate<br>
-        YOLO detection.</p>
+        <div class="upload-options">
+          <label class="upload-box" for="files">
+            <span class="upload-icon">☁</span>
+            <strong>Upload Images</strong>
+            <small>Drag &amp; drop or click to select</small>
+            <input id="files" type="file" accept="image/*" multiple>
+          </label>
+
+          <button class="upload-box camera-box" type="button" onclick="startCamera()">
+            <span class="upload-icon">◉</span>
+            <strong>Capture Live</strong>
+            <small>Capture 15 frames via webcam</small>
+          </button>
+        </div>
+
+        <div class="image-empty" id="preview">
+          <div class="info">ⓘ</div>
+          <p>
+            No images added yet. Add at least 15 varied images<br>
+            (different angles, lighting) for accurate YOLO detection.
+          </p>
+        </div>
       </div>
+    </section>
+
+    <!-- Form Action Buttons -->
+    <div class="register-actions">
+      <a href="training.html">Cancel</a>
+      <button class="save" type="button" onclick="savePerson()">Save &amp; Start Training</button>
     </div>
-  </section>
+  </main>
 
-  <div class="register-actions">
-    <a href="training.html">Cancel</a>
-    <button class="save" onclick="savePerson()">Save &amp; Start Training</button>
-  </div>
-</main>
-
-<script>
-const files = document.getElementById('files');
-files.addEventListener('change', () => {
-  document.getElementById('imageCount').textContent = files.files.length + ' / 15 min';
-});
-
-document.querySelectorAll('.label-btn').forEach(btn => {
-  btn.onclick = () => {
-    document.querySelectorAll('.label-btn').forEach(x => x.classList.remove('active'));
-    btn.classList.add('active');
-  };
-});
-
-function savePerson() {
-  const name = document.getElementById('fullName').value.trim();
-  if (!name) {
-    alert('Please enter Full Name');
-    return;
-  }
-  if (files.files.length < 1) {
-    alert('Please add at least 1 image for this demo.');
-    return;
-  }
-  alert('Person registered and training started for ' + name + '.');
-  location.href = 'training.html';
-}
-
-function startCamera() {
-  alert('Webcam capture can be connected to your camera/API here.');
-}
-</script>
+  <script src="js/main.js" defer></script>
+  <script src="js/add-person.js" defer></script>
 </body>
 </html>

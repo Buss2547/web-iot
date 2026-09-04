@@ -1,302 +1,87 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alerts — Security</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --peach: #f5c9a8;
-    --peach-dark: #e8b48a;
-    --bg: #f7f1e9;
-    --card: #ffffff;
-    --text: #1a1a1a;
-    --muted: #6b6b6b;
-    --border: #e8e0d5;
-    --green: #2e7d32;
-    --red: #c62828;
-    --orange: #e67e22;
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'DM Sans', system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-  }
-
-  /* ===== TOP BAR ===== */
-  .topbar {
-    background: var(--peach);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 32px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  .logo {
-    font-size: 1.35rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    color: #111;
-    text-decoration: none;
-  }
-  .nav-pills {
-    display: flex;
-    background: rgba(255,255,255,0.55);
-    border-radius: 999px;
-    padding: 4px;
-    gap: 2px;
-  }
-  .nav-pills a {
-    text-decoration: none;
-    color: #333;
-    font-size: 0.9rem;
-    font-weight: 500;
-    padding: 8px 20px;
-    border-radius: 999px;
-    transition: all 0.15s;
-  }
-  .nav-pills a.active,
-  .nav-pills a:hover {
-    background: #fff;
-    color: #111;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-  }
-  .login-btn {
-    background: #fff;
-    border: none;
-    border-radius: 999px;
-    padding: 9px 22px;
-    font-weight: 600;
-    font-size: 0.9rem;
-    cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-    text-decoration: none;
-    color: #111;
-  }
-  .login-btn:hover { background: #fafafa; }
-
-  /* ===== MAIN ===== */
-  .wrap {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 36px 32px 60px;
-  }
-
-  .heading-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 32px;
-  }
-  .eyebrow {
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    color: var(--muted);
-    text-transform: uppercase;
-    display: block;
-    margin-bottom: 6px;
-  }
-  .heading-row h1 {
-    font-size: 2.6rem;
-    font-weight: 700;
-    letter-spacing: -0.03em;
-    line-height: 1.05;
-  }
-  .heading-row p {
-    color: var(--muted);
-    margin-top: 6px;
-    font-size: 0.95rem;
-  }
-
-  .filter-btn {
-    background: #fff;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 10px 20px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  .filter-btn:hover,
-  .filter-btn.active {
-    background: #111;
-    color: #fff;
-    border-color: #111;
-  }
-
-  /* ===== ALERTS LIST ===== */
-  .alerts-panel {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    overflow: hidden;
-  }
-
-  .alert-row {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 18px 24px;
-    border-bottom: 1px solid var(--border);
-    transition: background 0.15s;
-  }
-  .alert-row:last-child {
-    border-bottom: none;
-  }
-  .alert-row:hover {
-    background: #fafafa;
-  }
-  .alert-row.unread {
-    background: #fff8f0;
-  }
-  .alert-row.unread:hover {
-    background: #fff3e6;
-  }
-  .alert-row.hidden {
-    display: none;
-  }
-
-  .alert-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 1rem;
-    flex-shrink: 0;
-  }
-  .alert-icon.danger {
-    background: #ffebee;
-    color: var(--red);
-  }
-  .alert-icon.ok {
-    background: #e8f5e9;
-    color: var(--green);
-  }
-
-  .alert-content {
-    flex: 1;
-  }
-  .alert-content b {
-    display: block;
-    font-size: 0.95rem;
-    font-weight: 600;
-    margin-bottom: 3px;
-  }
-  .alert-content small {
-    color: var(--muted);
-    font-size: 0.8rem;
-  }
-
-  .badge {
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    padding: 5px 12px;
-    border-radius: 999px;
-  }
-  .badge.danger {
-    background: #ffebee;
-    color: var(--red);
-  }
-  .badge.ok {
-    background: #e8f5e9;
-    color: var(--green);
-  }
-
-  @media (max-width: 600px) {
-    .heading-row {
-      flex-direction: column;
-      gap: 16px;
-    }
-    .alert-row {
-      padding: 16px;
-    }
-  }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alerts — Vigil Security</title>
+  <meta name="description" content="Review unauthorized access events and real-time security alerts.">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/alerts.css">
 </head>
 <body>
 
-<header class="topbar">
-  <a class="logo" href="detection.html">SECURITY</a>
+  <!-- Navigation Top Bar -->
+  <header class="topbar">
+    <a class="logo" href="index.html">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      SECURITY
+    </a>
 
-  <nav class="nav-pills">
-    <a href="detection.html">Detection</a>
-    <a href="training.html">Training</a>
-    <a class="active" href="alerts.html">Alerts</a>
-  </nav>
+    <nav class="nav-pills">
+      <a href="detection.html">Detection</a>
+      <a href="training.html">Training</a>
+      <a class="active" href="alerts.html">Alerts</a>
+    </nav>
 
-  <a class="login-btn" href="login.html">LOGIN</a>
-</header>
-
-<main class="wrap">
-  <section class="heading-row">
-    <div>
-      <span class="eyebrow">REAL-TIME MONITORING</span>
-      <h1>ALERTS</h1>
-      <p>Review unauthorized access and security events.</p>
+    <div class="auth-actions">
+      <a class="login-btn" href="login.html">LOGIN</a>
     </div>
-    <button class="filter-btn" id="filterBtn" onclick="filterAlerts()">SHOW UNREAD</button>
-  </section>
+  </header>
 
-  <section class="alerts-panel">
-    <div class="alert-row unread">
-      <span class="alert-icon danger">!</span>
-      <div class="alert-content">
-        <b>Unknown visitor detected</b>
-        <small>Camera 01 · Entrance · 14:38</small>
+  <!-- Main Content -->
+  <main class="wrap">
+    <section class="heading-row">
+      <div>
+        <span class="eyebrow">REAL-TIME SURVEILLANCE</span>
+        <h1>ALERTS</h1>
+        <p>Review unauthorized access attempts, blacklist detections, and security events.</p>
       </div>
-      <strong class="badge danger">HIGH</strong>
-    </div>
+      <button class="filter-btn" id="filterBtn" type="button">SHOW UNREAD</button>
+    </section>
 
-    <div class="alert-row">
-      <span class="alert-icon ok">✓</span>
-      <div class="alert-content">
-        <b>John Doe recognized</b>
-        <small>Camera 01 · Entrance · 14:32</small>
+    <!-- Alerts Panel -->
+    <section class="alerts-panel">
+      <div class="alert-row unread" title="Click to toggle read status">
+        <span class="alert-icon danger">!</span>
+        <div class="alert-content">
+          <b>Unknown visitor detected</b>
+          <small>Camera 01 · Entrance · 14:38</small>
+        </div>
+        <strong class="badge danger">HIGH</strong>
       </div>
-      <strong class="badge ok">NORMAL</strong>
-    </div>
 
-    <div class="alert-row">
-      <span class="alert-icon ok">✓</span>
-      <div class="alert-content">
-        <b>Alex Smith recognized</b>
-        <small>Camera 01 · Entrance · 14:41</small>
+      <div class="alert-row" title="Click to toggle read status">
+        <span class="alert-icon ok">✓</span>
+        <div class="alert-content">
+          <b>John Doe recognized</b>
+          <small>Camera 01 · Entrance · 14:32</small>
+        </div>
+        <strong class="badge ok">NORMAL</strong>
       </div>
-      <strong class="badge ok">NORMAL</strong>
-    </div>
-  </section>
-</main>
 
-<script>
-let showingUnread = false;
-function filterAlerts() {
-  showingUnread = !showingUnread;
-  const btn = document.getElementById('filterBtn');
-  btn.textContent = showingUnread ? 'SHOW ALL' : 'SHOW UNREAD';
-  btn.classList.toggle('active', showingUnread);
+      <div class="alert-row" title="Click to toggle read status">
+        <span class="alert-icon ok">✓</span>
+        <div class="alert-content">
+          <b>Alex Smith recognized</b>
+          <small>Camera 01 · Entrance · 14:41</small>
+        </div>
+        <strong class="badge ok">NORMAL</strong>
+      </div>
 
-  document.querySelectorAll('.alert-row').forEach(row => {
-    if (showingUnread) {
-      row.classList.toggle('hidden', !row.classList.contains('unread'));
-    } else {
-      row.classList.remove('hidden');
-    }
-  });
-}
-</script>
+      <div class="alert-row unread" title="Click to toggle read status">
+        <span class="alert-icon danger">!</span>
+        <div class="alert-content">
+          <b>Blacklist person detected (Unknown #47)</b>
+          <small>Camera 02 · Back Gate · 10:15</small>
+        </div>
+        <strong class="badge danger">CRITICAL</strong>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/main.js" defer></script>
+  <script src="js/alerts.js" defer></script>
 </body>
 </html>

@@ -1,0 +1,339 @@
+/* ==========================================================================
+   Vigil Security System — Training Page Styles (training.html)
+   ========================================================================== */
+
+/* ===== ACTIONS & SEARCH ===== */
+.actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+#search {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  width: 240px;
+  outline: none;
+  transition: var(--transition);
+}
+
+#search:focus {
+  border-color: var(--peach-dark);
+  box-shadow: 0 0 0 3px rgba(232, 180, 138, 0.25);
+}
+
+.add-btn {
+  background: #111;
+  color: #fff;
+  text-decoration: none;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: var(--transition);
+}
+
+.add-btn:hover {
+  background: #2d3748;
+  transform: translateY(-1px);
+}
+
+/* ===== FILTERS ===== */
+.filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.filters button {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 8px 18px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  color: #4a5568;
+  transition: var(--transition);
+}
+
+.filters button:hover {
+  background: #edf2f7;
+  color: #1a202c;
+}
+
+.filters button.selected {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+/* ===== PEOPLE GRID ===== */
+.people-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 18px;
+  margin-bottom: 40px;
+}
+
+.person-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+.person-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #fff;
+}
+
+.avatar.cyan { background: var(--cyan); }
+.avatar.yellow { background: var(--yellow); color: #2d3748; }
+.avatar.gray { background: var(--gray); }
+.avatar.red { background: var(--red); }
+
+.tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.employee-tag { background: var(--cyan-bg); color: #00695c; }
+.family-tag { background: var(--yellow-bg); color: #b7791f; }
+.visitor-tag { background: var(--gray-bg); color: #4a5568; }
+.blacklist-tag { background: var(--red-bg); color: var(--red); }
+.vip-tag { background: var(--orange-bg); color: #c05621; }
+
+.person-card h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.time {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.line {
+  height: 1px;
+  background: var(--border);
+  margin: 14px 0;
+}
+
+.metrics {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.metrics b {
+  display: block;
+  font-size: 0.95rem;
+  color: var(--text);
+  margin-top: 2px;
+  font-weight: 600;
+}
+
+/* ===== TRAINING STATUS PANEL ===== */
+.training-status {
+  background: #141923;
+  border-radius: var(--radius-lg);
+  color: #fff;
+  padding: 28px;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 32px;
+  box-shadow: var(--shadow-md);
+}
+
+.model-info {
+  border-right: 1px solid #283347;
+  padding-right: 32px;
+}
+
+.status-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1rem;
+  margin-bottom: 24px;
+}
+
+.active-pill {
+  margin-left: auto;
+  background: rgba(38, 166, 154, 0.2);
+  color: #4db6ac;
+  border: 1px solid #26a69a;
+  border-radius: var(--radius-pill);
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.model-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.model-stats small {
+  display: block;
+  color: #8899a6;
+  font-size: 0.75rem;
+  margin-bottom: 4px;
+}
+
+.model-stats b {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #f7fafc;
+}
+
+.model-stats b.blue {
+  color: #4fc3f7;
+}
+
+/* GPU Section */
+.gpu-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: #cbd5e0;
+  margin-bottom: 10px;
+}
+
+.gpu-top strong {
+  color: #4fc3f7;
+}
+
+.progress {
+  height: 6px;
+  background: #253347;
+  border-radius: 999px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.progress span {
+  display: block;
+  width: 75%;
+  height: 100%;
+  background: linear-gradient(90deg, #00b4d8, #4fc3f7);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.console {
+  background: #0d1219;
+  border: 1px solid #253347;
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.75rem;
+  color: #718096;
+  line-height: 1.6;
+  height: 95px;
+  overflow-y: auto;
+  margin-bottom: 14px;
+}
+
+.console .current {
+  color: #4fc3f7;
+}
+
+.gpu-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.gpu-buttons button {
+  height: 36px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #2d3f58;
+  background: #1a2332;
+  color: #e2e8f0;
+  transition: var(--transition);
+}
+
+.gpu-buttons button:hover {
+  background: #243147;
+}
+
+.gpu-buttons button.resume {
+  background: #0c3540;
+  border-color: #00838f;
+  color: #4fc3f7;
+}
+
+.gpu-buttons button.resume:hover {
+  background: #0e4554;
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+  .training-status {
+    grid-template-columns: 1fr;
+  }
+  .model-info {
+    border-right: none;
+    border-bottom: 1px solid #283347;
+    padding-right: 0;
+    padding-bottom: 24px;
+  }
+}
+
+@media (max-width: 600px) {
+  .actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  #search {
+    width: 100%;
+  }
+  .add-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .model-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

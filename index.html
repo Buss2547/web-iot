@@ -1,159 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Security — Vigil</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --peach: #f5c9a8;
-    --peach-dark: #e8b48a;
-    --bg: #f7f1e9;
-    --text: #1a1a1a;
-    --muted: #6b6b6b;
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'DM Sans', system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-  }
-
-  /* ===== TOP BAR ===== */
-  .topbar {
-    background: var(--peach);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 32px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  .logo {
-    font-size: 1.35rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    color: #111;
-    text-decoration: none;
-  }
-  .nav-pills {
-    display: flex;
-    background: rgba(255,255,255,0.55);
-    border-radius: 999px;
-    padding: 4px;
-    gap: 2px;
-  }
-  .nav-pills a {
-    text-decoration: none;
-    color: #333;
-    font-size: 0.9rem;
-    font-weight: 500;
-    padding: 8px 20px;
-    border-radius: 999px;
-    transition: all 0.15s;
-  }
-  .nav-pills a:hover {
-    background: #fff;
-    color: #111;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-  }
-  .auth-actions {
-    display: flex;
-    gap: 10px;
-  }
-  .login-btn, .signup-btn {
-    background: #fff;
-    border: none;
-    border-radius: 999px;
-    padding: 9px 20px;
-    font-weight: 600;
-    font-size: 0.9rem;
-    cursor: pointer;
-    text-decoration: none;
-    color: #111;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  }
-  .login-btn:hover, .signup-btn:hover {
-    background: #fafafa;
-  }
-
-  /* ===== HERO ===== */
-  .hero {
-    min-height: calc(100vh - 70px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 40px 24px;
-  }
-  .hero-content {
-    max-width: 780px;
-  }
-  .hero h1 {
-    font-size: clamp(2.8rem, 7vw, 4.8rem);
-    font-weight: 700;
-    line-height: 1.05;
-    letter-spacing: -0.03em;
-    margin-bottom: 28px;
-  }
-  .hero p {
-    font-size: 0.95rem;
-    color: var(--muted);
-    line-height: 1.7;
-    letter-spacing: 0.02em;
-    margin-bottom: 40px;
-    max-width: 560px;
-    margin-left: auto;
-    margin-right: auto;
-  }
-  .cta {
-    display: inline-block;
-    background: var(--peach);
-    color: #111;
-    text-decoration: none;
-    font-weight: 700;
-    font-size: 0.95rem;
-    padding: 14px 36px;
-    border-radius: 999px;
-    transition: all 0.15s;
-  }
-  .cta:hover {
-    background: var(--peach-dark);
-    transform: translateY(-1px);
-  }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vigil — AI Smart Security & IoT Recognition</title>
+  <meta name="description" content="Vigil automatically logs every visitor, detects unauthorized access, and alerts you in real time with AI face recognition.">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/landing.css">
 </head>
 <body>
 
-<header class="topbar">
-  <a class="logo" href="index.html">SECURITY</a>
+  <!-- Navigation Top Bar -->
+  <header class="topbar">
+    <a class="logo" href="index.html">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      SECURITY
+    </a>
 
-  <nav class="nav-pills">
-    <a href="detection.html">Detection</a>
-    <a href="training.html">Training</a>
-    <a href="alerts.html">Alerts</a>
-  </nav>
+    <nav class="nav-pills">
+      <a href="detection.html">Detection</a>
+      <a href="training.html">Training</a>
+      <a href="alerts.html">Alerts</a>
+    </nav>
 
-  <div class="auth-actions">
-    <a class="login-btn" href="login.html">LOGIN</a>
-    <a class="signup-btn" href="signup.html">SIGNUP</a>
-  </div>
-</header>
+    <div class="auth-actions">
+      <a class="login-btn" href="login.html">LOGIN</a>
+      <a class="signup-btn" href="signup.html">SIGN UP</a>
+    </div>
+  </header>
 
-<main class="hero">
-  <div class="hero-content">
-    <h1>KNOW WHO'S AT YOUR<br>DOOR.<br>ALWAYS.</h1>
-    <p>VIGIL AUTOMATICALLY LOGS EVERY VISITOR, DETECTS UNAUTHORIZED ACCESS,<br>
-    AND ALERTS YOU IN REAL TIME — SO YOU NEVER MISS A MOMENT THAT MATTERS.</p>
-    <a class="cta" href="detection.html">GET STARTED</a>
-  </div>
-</main>
+  <!-- Hero Section -->
+  <main class="hero">
+    <div class="hero-content">
+      <div class="hero-badge">
+        <span>●</span> AI-POWERED SURVEILLANCE & IoT
+      </div>
+      <h1>KNOW WHO'S AT YOUR<br>DOOR.<br>ALWAYS.</h1>
+      <p>
+        VIGIL AUTOMATICALLY LOGS EVERY VISITOR, DETECTS UNAUTHORIZED ACCESS,<br>
+        AND ALERTS YOU IN REAL TIME — SO YOU NEVER MISS A MOMENT THAT MATTERS.
+      </p>
+      <a class="cta" href="detection.html">
+        GET STARTED
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+          <polyline points="12 5 19 12 12 19"></polyline>
+        </svg>
+      </a>
 
+      <div class="hero-features">
+        <div class="hero-feat-item">
+          <span>✓</span> YOLOv8 Face Detection
+        </div>
+        <div class="hero-feat-item">
+          <span>✓</span> ESP32-CAM IoT Ready
+        </div>
+        <div class="hero-feat-item">
+          <span>✓</span> Real-Time Security Alerts
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/main.js" defer></script>
 </body>
 </html>
