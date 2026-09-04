@@ -1,5 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router";
+<<<<<<< HEAD
 import { Shield, Camera, Database, Bell, UserPlus, LogIn, LogOut, User } from "lucide-react";
 import { initialAlerts } from "../../mocks/mockAlerts";
 import { useAuth } from "../../context/AuthContext";
@@ -7,6 +8,13 @@ import { useAuth } from "../../context/AuthContext";
 export default function Navbar() {
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
+=======
+import { Shield, Camera, Database, Bell, UserPlus, LogIn } from "lucide-react";
+import { initialAlerts } from "../../mocks/mockAlerts";
+
+export default function Navbar() {
+  const location = useLocation();
+>>>>>>> e56e852f926bab241dfea2144d00ca88b574d79a
   const unreadAlertsCount = initialAlerts.filter((a) => !a.isRead).length;
 
   const navLinks = [
@@ -83,6 +91,7 @@ export default function Navbar() {
             <span>Add Person</span>
           </Link>
 
+<<<<<<< HEAD
           {isAuthenticated ? (
             <div className="flex items-center gap-2">
               <div className="hidden lg:flex items-center gap-2 bg-[#f7f1e9] border border-[#e8e0d5] px-3 py-1 rounded-xl text-xs">
@@ -117,6 +126,15 @@ export default function Navbar() {
               <span>Login</span>
             </Link>
           )}
+=======
+          <Link
+            to="/login"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white hover:bg-[#f7f1e9] text-[#1a1a1a] border border-[#e8e0d5] transition-all"
+          >
+            <LogIn className="w-3.5 h-3.5 text-[#6b6b6b]" />
+            <span>Login</span>
+          </Link>
+>>>>>>> e56e852f926bab241dfea2144d00ca88b574d79a
         </div>
       </div>
 

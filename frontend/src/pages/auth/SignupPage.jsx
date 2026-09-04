@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router";
+<<<<<<< HEAD
 import { User, Mail, Lock, ShieldCheck, AlertCircle, Loader2 } from "lucide-react";
 import Input from "../../components/common/Input";
 import Button from "../../components/common/Button";
@@ -10,12 +11,21 @@ export default function SignupPage() {
   const navigate = useNavigate();
   const { signup, login } = useAuth();
 
+=======
+import { User, Mail, Lock, ShieldCheck } from "lucide-react";
+import Input from "../../components/common/Input";
+import Button from "../../components/common/Button";
+
+export default function SignupPage() {
+  const navigate = useNavigate();
+>>>>>>> e56e852f926bab241dfea2144d00ca88b574d79a
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState("Operator");
   const [loading, setLoading] = useState(false);
+<<<<<<< HEAD
   const [error, setError] = useState("");
 
   const handleSubmit = async (e) => {
@@ -68,6 +78,16 @@ export default function SignupPage() {
     } finally {
       setLoading(false);
     }
+=======
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      navigate("/detection");
+    }, 600);
+>>>>>>> e56e852f926bab241dfea2144d00ca88b574d79a
   };
 
   return (
@@ -79,6 +99,7 @@ export default function SignupPage() {
         </p>
       </div>
 
+<<<<<<< HEAD
       {/* Error Alert Banner */}
       {error && (
         <div className="flex items-start gap-2.5 p-3 rounded-xl bg-[#ffebee] border border-[#ef9a9a] text-[#c62828] text-xs leading-relaxed animate-shake">
@@ -90,6 +111,8 @@ export default function SignupPage() {
         </div>
       )}
 
+=======
+>>>>>>> e56e852f926bab241dfea2144d00ca88b574d79a
       <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
         <Input
           label="Full Name"
@@ -99,7 +122,10 @@ export default function SignupPage() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
+<<<<<<< HEAD
           disabled={loading}
+=======
+>>>>>>> e56e852f926bab241dfea2144d00ca88b574d79a
         />
 
         <Input
@@ -110,8 +136,11 @@ export default function SignupPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
+<<<<<<< HEAD
           autoComplete="email"
           disabled={loading}
+=======
+>>>>>>> e56e852f926bab241dfea2144d00ca88b574d79a
         />
 
         <div className="flex flex-col gap-1.5">
@@ -121,8 +150,12 @@ export default function SignupPage() {
           <select
             value={role}
             onChange={(e) => setRole(e.target.value)}
+<<<<<<< HEAD
             disabled={loading}
             className="w-full bg-white border border-[#e8e0d5] text-[#1a1a1a] text-sm rounded-xl px-3.5 py-2.5 outline-none focus:border-[#e8b48a] focus:ring-2 focus:ring-[#f5c9a8]/30 transition-all disabled:opacity-60"
+=======
+            className="w-full bg-white border border-[#e8e0d5] text-[#1a1a1a] text-sm rounded-xl px-3.5 py-2.5 outline-none focus:border-[#e8b48a] focus:ring-2 focus:ring-[#f5c9a8]/30"
+>>>>>>> e56e852f926bab241dfea2144d00ca88b574d79a
           >
             <option value="Operator">Security Operator (Live Monitoring)</option>
             <option value="Engineer">AI & IoT Field Engineer</option>
@@ -134,12 +167,19 @@ export default function SignupPage() {
           label="Password"
           type="password"
           icon={Lock}
+<<<<<<< HEAD
           placeholder="At least 6 characters"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
           autoComplete="new-password"
           disabled={loading}
+=======
+          placeholder="At least 8 characters"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+>>>>>>> e56e852f926bab241dfea2144d00ca88b574d79a
         />
 
         <Input
@@ -150,8 +190,11 @@ export default function SignupPage() {
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           required
+<<<<<<< HEAD
           autoComplete="new-password"
           disabled={loading}
+=======
+>>>>>>> e56e852f926bab241dfea2144d00ca88b574d79a
         />
 
         <Button
@@ -159,10 +202,17 @@ export default function SignupPage() {
           variant="primary"
           size="lg"
           disabled={loading}
+<<<<<<< HEAD
           icon={loading ? Loader2 : ShieldCheck}
           className="mt-2 w-full font-semibold"
         >
           {loading ? "Creating Operator Profile..." : "Create Operator Profile"}
+=======
+          icon={ShieldCheck}
+          className="mt-2 w-full"
+        >
+          {loading ? "Registering..." : "Create Operator Profile"}
+>>>>>>> e56e852f926bab241dfea2144d00ca88b574d79a
         </Button>
       </form>
 

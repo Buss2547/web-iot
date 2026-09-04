@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+<<<<<<< HEAD
 import { Link, useNavigate, useLocation } from "react-router";
 import { Mail, Lock, LogIn, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import Input from "../../components/common/Input";
@@ -42,6 +43,27 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+=======
+import { Link, useNavigate } from "react-router";
+import { Mail, Lock, LogIn } from "lucide-react";
+import Input from "../../components/common/Input";
+import Button from "../../components/common/Button";
+
+export default function LoginPage() {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("admin@vigil-security.io");
+  const [password, setPassword] = useState("••••••••••••");
+  const [rememberMe, setRememberMe] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      navigate("/detection");
+    }, 600);
+>>>>>>> e56e852f926bab241dfea2144d00ca88b574d79a
   };
 
   return (
@@ -53,6 +75,7 @@ export default function LoginPage() {
         </p>
       </div>
 
+<<<<<<< HEAD
       {/* Success Notification (e.g. from signup redirect) */}
       {successMessage && (
         <div className="flex items-center gap-2.5 p-3 rounded-xl bg-[#e8f5e9] border border-[#a5d6a7] text-[#2e7d32] text-xs">
@@ -72,29 +95,43 @@ export default function LoginPage() {
         </div>
       )}
 
+=======
+>>>>>>> e56e852f926bab241dfea2144d00ca88b574d79a
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <Input
           label="Work Email"
           type="email"
           icon={Mail}
+<<<<<<< HEAD
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
           autoComplete="email"
           disabled={loading}
+=======
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+>>>>>>> e56e852f926bab241dfea2144d00ca88b574d79a
         />
 
         <Input
           label="Password"
           type="password"
           icon={Lock}
+<<<<<<< HEAD
           placeholder="Enter your security password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
           autoComplete="current-password"
           disabled={loading}
+=======
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+>>>>>>> e56e852f926bab241dfea2144d00ca88b574d79a
         />
 
         <div className="flex items-center justify-between text-xs pt-1">
@@ -104,11 +141,15 @@ export default function LoginPage() {
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
               className="rounded border-[#e8e0d5] text-[#f5c9a8] focus:ring-[#f5c9a8]"
+<<<<<<< HEAD
               disabled={loading}
+=======
+>>>>>>> e56e852f926bab241dfea2144d00ca88b574d79a
             />
             <span>Remember device</span>
           </label>
 
+<<<<<<< HEAD
           <a
             href="#forgot-password"
             onClick={(e) => {
@@ -117,6 +158,9 @@ export default function LoginPage() {
             }}
             className="font-semibold text-[#e8b48a] hover:underline"
           >
+=======
+          <a href="#" className="font-semibold text-[#e8b48a] hover:underline">
+>>>>>>> e56e852f926bab241dfea2144d00ca88b574d79a
             Forgot password?
           </a>
         </div>
@@ -126,10 +170,17 @@ export default function LoginPage() {
           variant="primary"
           size="lg"
           disabled={loading}
+<<<<<<< HEAD
           icon={loading ? Loader2 : LogIn}
           className="mt-2 w-full font-semibold"
         >
           {loading ? "Authenticating Operator..." : "Sign In to Dashboard"}
+=======
+          icon={LogIn}
+          className="mt-2 w-full"
+        >
+          {loading ? "Authenticating..." : "Sign In to Dashboard"}
+>>>>>>> e56e852f926bab241dfea2144d00ca88b574d79a
         </Button>
       </form>
 
