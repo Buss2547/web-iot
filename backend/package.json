@@ -1,0 +1,9 @@
+{
+  "name": "vigil-backend",
+  "version": "1.0.0",
+  "description": "FastAPI Backend for Vigil AI Smart Security",
+  "scripts": {
+    "dev": "python run.py",
+    "start": "python run.py"
+  }
+}
