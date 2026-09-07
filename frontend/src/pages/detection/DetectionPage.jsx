@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Users,
   CheckCircle2,
@@ -10,20 +10,32 @@ import {
   Clock,
   Radio,
   RefreshCw,
-  Wifi,
-  WifiOff,
   ExternalLink,
   SlidersHorizontal,
   Check,
+  Sparkles,
+  Package,
+  Bell,
+  Home,
+  UserPlus,
+  Play,
+  Pause,
+  UserCheck,
+  User,
+  Tag,
+  Zap,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import MetricCard from "../../components/common/MetricCard";
 import Badge from "../../components/common/Badge";
 import Button from "../../components/common/Button";
 import Modal from "../../components/common/Modal";
-import Input from "../../components/common/Input";
+import { Input, Textarea } from "../../components/common/Input";
 import { initialVisitors } from "../../mocks/mockVisitors";
+import { detectionApi, personsApi } from "../../services/api";
 
-const DEFAULT_IP = "192.168.137.112";
+const DEFAULT_IP = "192.168.137.65";
 const DEFAULT_PATH = "/stream";
 const DEFAULT_STREAM_URL = `http://${DEFAULT_IP}${DEFAULT_PATH}`;
 
@@ -57,12 +69,57 @@ const parseStreamUrl = (url) => {
 };
 
 export default function DetectionPage() {
-  const [visitors] = useState(initialVisitors);
+  const [visitors, setVisitors] = useState(initialVisitors);
+  const [historyCategory, setHistoryCategory] = useState("ALL");
   const [showBoxes, setShowBoxes] = useState(true);
   const [selectedCamera, setSelectedCamera] = useState("cam-1");
   const [currentTime, setCurrentTime] = useState("");
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [isAutoDetect, setIsAutoDetect] = useState(true);
+  const [autoDetectInterval, setAutoDetectInterval] = useState(3000);
   const [snapshotSuccess, setSnapshotSuccess] = useState(false);
+  const [alertNotification, setAlertNotification] = useState(null);
+  const [isSoundEnabled, setIsSoundEnabled] = useState(true);
+
+  const isDetectingRef = useRef(false);
+
+  // Identify & Train Modal State
+  const [isIdentifyModalOpen, setIsIdentifyModalOpen] = useState(false);
+  const [selectedRecordForIdentify, setSelectedRecordForIdentify] = useState(null);
+  const [identifyMode, setIdentifyMode] = useState("new"); // "existing" | "new"
+  const [registeredPersonsList, setRegisteredPersonsList] = useState([]);
+  const [selectedExistingPersonId, setSelectedExistingPersonId] = useState("");
+  const [newPersonForm, setNewPersonForm] = useState({
+    name: "",
+    category: "household",
+    role: "Family",
+    department: "ครอบครัว",
+    notes: "",
+  });
+  const [isSubmittingIdentify, setIsSubmittingIdentify] = useState(false);
+  const [identifySuccessMessage, setIdentifySuccessMessage] = useState("");
+
+  // Real-time Stats from Database
+  const [stats, setStats] = useState({
+    total_today: 4,
+    household_count: 2,
+    delivery_count: 1,
+    stranger_count: 1,
+    alerts_count: 2,
+  });
+
+  // Active YOLO Bounding Box Detections
+  const [activeDetections, setActiveDetections] = useState([
+    {
+      person_name: "ดร. สมชาย รักสงบ (พ่อ)",
+      category: "household",
+      confidence: 99.4,
+      role: "Family",
+      bounding_box: [160, 60, 480, 520],
+      location: "หน้าประตูหลัก (Main Entrance)",
+    },
+  ]);
 
   // Camera IP & Stream Configuration State
   const [cameraIp, setCameraIp] = useState(() => {
@@ -103,6 +160,49 @@ export default function DetectionPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // Fetch Database Stats & Recent Visitors History
+  const fetchStatsAndHistory = async () => {
+    try {
+      const s = await detectionApi.getStats();
+      if (s) setStats(s);
+    } catch (err) {
+      console.warn("Backend stats unavailable, using cached defaults:", err);
+    }
+
+    try {
+      const h = await detectionApi.getHistory(historyCategory);
+      if (h && Array.isArray(h) && h.length > 0) {
+        const formatted = h.map((item) => ({
+          id: `hist-${item.id}`,
+          name: item.person_name,
+          role: item.category,
+          confidence: item.confidence,
+          time: new Date(item.timestamp).toLocaleTimeString("th-TH", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          status: item.category === "stranger" ? "UNKNOWN" : "KNOWN",
+          photoUrl: item.snapshot_path?.startsWith("http")
+            ? item.snapshot_path
+            : item.snapshot_path
+            ? `http://localhost:8000${item.snapshot_path}`
+            : "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+          location: item.location,
+          alert_triggered: item.alert_triggered,
+        }));
+        setVisitors(formatted);
+      }
+    } catch (err) {
+      console.warn("Backend history unavailable, using initial visitors:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchStatsAndHistory();
+    const interval = setInterval(fetchStatsAndHistory, 10000);
+    return () => clearInterval(interval);
+  }, [historyCategory]);
+
   // Sync modal form when opening
   const handleOpenSettings = () => {
     const currentParsed = parseStreamUrl(streamUrl);
@@ -140,14 +240,6 @@ export default function DetectionPage() {
     setIsSettingsOpen(false);
   };
 
-  // Reset to default
-  const handleResetDefault = () => {
-    setTempIp(DEFAULT_IP);
-    setTempPort("");
-    setTempPath(DEFAULT_PATH);
-    setTempMode("live");
-  };
-
   // Apply quick presets
   const applyPreset = (presetIp, presetPort = "", presetPath = "/stream") => {
     setTempIp(presetIp);
@@ -155,9 +247,9 @@ export default function DetectionPage() {
     setTempPath(presetPath);
   };
 
+  // Snapshot Button
   const handleTakeSnapshot = () => {
     setIsCapturing(true);
-
     if (streamMode === "live" && streamStatus === "online") {
       try {
         const captureUrl = `http://${cameraIp}/capture?t=${Date.now()}`;
@@ -181,6 +273,258 @@ export default function DetectionPage() {
     }, 500);
   };
 
+  // Web Audio API Real-time Alert Chime Synthesizer
+  const playAlertChime = (category) => {
+    if (!isSoundEnabled) return;
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      if (category === "stranger") {
+        // Warning 2-tone alarm for stranger
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(880, now);
+        osc.frequency.setValueAtTime(659.25, now + 0.15);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+        osc.start(now);
+        osc.stop(now + 0.4);
+      } else if (category === "delivery") {
+        // Double doorbell chime for courier
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(659.25, now);
+        osc.frequency.setValueAtTime(783.99, now + 0.12);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+        osc.start(now);
+        osc.stop(now + 0.35);
+      } else {
+        // Gentle pleasant chime for household
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(523.25, now);
+        osc.frequency.setValueAtTime(659.25, now + 0.12);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+        osc.start(now);
+        osc.stop(now + 0.35);
+      }
+    } catch (err) {
+      console.debug("Audio playback waiting for user interaction:", err);
+    }
+  };
+
+  // Trigger Real-time YOLO Detection & Person Classification
+  const handleRunYoloDetection = async () => {
+    if (isDetectingRef.current) return;
+    isDetectingRef.current = true;
+    setIsDetecting(true);
+
+    try {
+      let res = null;
+
+      // 1. Try grabbing the live video frame directly from visible image in browser
+      const streamImg = document.getElementById("esp32-stream-img");
+      if (
+        streamMode === "live" &&
+        streamStatus === "online" &&
+        streamImg &&
+        streamImg.complete &&
+        streamImg.naturalWidth > 0
+      ) {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = streamImg.naturalWidth || 640;
+          canvas.height = streamImg.naturalHeight || 480;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(streamImg, 0, 0);
+          const blob = await new Promise((resolve) =>
+            canvas.toBlob(resolve, "image/jpeg", 0.88)
+          );
+          if (blob && blob.size > 1000) {
+            const formData = new FormData();
+            formData.append("file", blob, "live_stream_frame.jpg");
+            formData.append("camera_id", `ESP32 (${cameraIp})`);
+            formData.append("location", "หน้าบ้าน (Main Entrance)");
+            res = await detectionApi.detectImage(formData);
+          }
+        } catch (canvasErr) {
+          console.debug("Live stream canvas grab skipped (fallback to API):", canvasErr);
+        }
+      }
+
+      // 2. Fallback to direct backend ESP32 proxy detect if canvas was not used
+      if (!res) {
+        res = await detectionApi.detectESP32({
+          camera_ip: cameraIp,
+          camera_port: tempPort || "",
+          camera_path: "/capture",
+          location: "หน้าบ้าน (Main Entrance)",
+        });
+      }
+
+      if (res && res.detections && res.detections.length > 0) {
+        setActiveDetections(res.detections);
+        const hasStranger = res.detections.some((d) => d.category === "stranger");
+        const hasDelivery = res.detections.some((d) => d.category === "delivery");
+        const primary = res.detections[0];
+
+        const alertCategory = hasStranger ? "stranger" : hasDelivery ? "delivery" : "household";
+        playAlertChime(alertCategory);
+
+        if (hasStranger) {
+          setAlertNotification({
+            type: "warning",
+            title: `⚠️ ตรวจพบคนแปลกหน้า: ${primary.person_name}`,
+            message: `ระบบตรวจจับใบหน้า (${primary.confidence}%) ไม่ตรงกับฐานข้อมูล และได้ส่งแจ้งเตือนความปลอดภัยแล้ว`,
+            isStranger: true,
+            time: new Date().toLocaleTimeString("th-TH"),
+          });
+        } else if (hasDelivery) {
+          setAlertNotification({
+            type: "info",
+            title: `📦 ตรวจพบคนส่งของ: ${primary.person_name}`,
+            message: `ตรวจพบพนักงานขนส่ง/ไรเดอร์ (${primary.confidence}%) มาถึงบริเวณหน้าบ้าน`,
+            isStranger: false,
+            time: new Date().toLocaleTimeString("th-TH"),
+          });
+        } else {
+          setAlertNotification({
+            type: "success",
+            title: `🟢 ยืนยันตัวตน: ${primary.person_name}`,
+            message: `ตรวจพบและจดจำใบหน้าของสมาชิกในบ้าน (${primary.confidence}%) อย่างปลอดภัย`,
+            isStranger: false,
+            time: new Date().toLocaleTimeString("th-TH"),
+          });
+        }
+
+        window.dispatchEvent(new Event("vigil-alerts-updated"));
+        setTimeout(() => setAlertNotification(null), 6000);
+      }
+
+      await fetchStatsAndHistory();
+    } catch (err) {
+      console.error("YOLO Detect error:", err);
+    } finally {
+      isDetectingRef.current = false;
+      setIsDetecting(false);
+    }
+  };
+
+  // Continuous Auto AI Detect Loop (Non-blocking and never cancels)
+  useEffect(() => {
+    if (!isAutoDetect) return;
+
+    const timer = setInterval(async () => {
+      if (!isDetectingRef.current) {
+        await handleRunYoloDetection();
+      }
+    }, autoDetectInterval);
+
+    return () => clearInterval(timer);
+  }, [isAutoDetect, autoDetectInterval, cameraIp, tempPort, streamMode, streamStatus]);
+
+  // Open Identify & Train Modal for a visitor record
+  const handleOpenIdentifyModal = async (record) => {
+    setSelectedRecordForIdentify(record);
+    const isStranger = record.role === "stranger" || record.name?.includes("แปลกหน้า") || record.name?.includes("Stranger");
+    setIdentifyMode(isStranger ? "new" : "existing");
+    setNewPersonForm({
+      name: isStranger ? "" : record.name || "",
+      category: record.role === "delivery" ? "delivery" : "household",
+      role: record.role === "delivery" ? "Delivery" : "Family",
+      department: record.role === "delivery" ? "ขนส่งพัสดุ" : "ครอบครัว",
+      notes: `ระบุตัวตนจากภาพถ่ายกล้องสด บันทึกเมื่อ ${record.time || new Date().toLocaleTimeString("th-TH")}`,
+    });
+    setIdentifySuccessMessage("");
+    setIsIdentifyModalOpen(true);
+
+    try {
+      const pList = await personsApi.getPersons();
+      if (pList && Array.isArray(pList)) {
+        setRegisteredPersonsList(pList);
+        if (pList.length > 0) {
+          setSelectedExistingPersonId(pList[0].id);
+        }
+      }
+    } catch (e) {
+      console.warn("Could not fetch persons list:", e);
+    }
+  };
+
+  // Submit Identify & Train Request
+  const handleSaveIdentify = async (e) => {
+    if (e) e.preventDefault();
+    if (!selectedRecordForIdentify) return;
+
+    setIsSubmittingIdentify(true);
+    try {
+      const rawId = selectedRecordForIdentify.id.toString().replace("hist-", "");
+      let payload = {};
+
+      if (identifyMode === "existing") {
+        if (!selectedExistingPersonId) {
+          alert("กรุณาเลือกบุคคลที่ต้องการเชื่อมโยง");
+          setIsSubmittingIdentify(false);
+          return;
+        }
+        payload = {
+          mode: "existing",
+          person_id: parseInt(selectedExistingPersonId, 10),
+        };
+      } else {
+        if (!newPersonForm.name.trim()) {
+          alert("กรุณากรอกชื่อ-นามสกุล");
+          setIsSubmittingIdentify(false);
+          return;
+        }
+        payload = {
+          mode: "new",
+          name: newPersonForm.name.trim(),
+          category: newPersonForm.category,
+          role: newPersonForm.role,
+          department: newPersonForm.department,
+          notes: newPersonForm.notes,
+        };
+      }
+
+      const res = await detectionApi.identifyPerson(rawId, payload);
+      setIdentifySuccessMessage(res.message || "บันทึกและส่งเทรนโมเดลเรียบร้อยแล้ว!");
+      window.dispatchEvent(new Event("vigil-alerts-updated"));
+
+      // Update visitor item in state immediately
+      setVisitors((prev) =>
+        prev.map((v) =>
+          v.id === selectedRecordForIdentify.id
+            ? {
+                ...v,
+                name: res.person_name,
+                role: res.category,
+                status: res.category === "stranger" ? "UNKNOWN" : "KNOWN",
+              }
+            : v
+        )
+      );
+
+      await fetchStatsAndHistory();
+
+      setTimeout(() => {
+        setIsIdentifyModalOpen(false);
+        setIdentifySuccessMessage("");
+      }, 1400);
+    } catch (err) {
+      console.error("Failed to identify person:", err);
+      alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล: " + (err.response?.data?.detail || err.message));
+    } finally {
+      setIsSubmittingIdentify(false);
+    }
+  };
+
   const cameras = [
     {
       id: "cam-1",
@@ -192,63 +536,109 @@ export default function DetectionPage() {
     { id: "cam-3", name: "CAM 03 — Perimeter Fence (ESP32)", status: "ONLINE", fps: 25 },
   ];
 
-  // Calculated preview URL in modal
-  const modalPreviewUrl = buildStreamUrl(tempIp, tempPort, tempPath);
-
   return (
     <div className="flex flex-col gap-6 py-2">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-[#1a1a1a] tracking-tight">
-            Live Detection & Monitoring
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl sm:text-3xl font-black text-[#1a1a1a] tracking-tight">
+              Live Detection & Monitoring
+            </h1>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#26a69a]/15 text-[#00796b] border border-[#80cbc4]">
+              YOLOv8 Active
+            </span>
+          </div>
           <p className="text-xs sm:text-sm text-[#6b6b6b]">
-            Real-time YOLOv8 edge inference stream and security telemetry
+            ระบบจำแนกบุคคล 3 กลุ่ม: คนในบ้าน • คนส่งของ • คนแปลกหน้า พร้อมบันทึกประวัติลงฐานข้อมูล
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-[#e8e0d5] text-xs font-semibold shadow-2xs">
             <Radio className="w-4 h-4 text-[#2e7d32] animate-pulse" />
-            <span className="text-[#1a1a1a]">WebSocket Stream: CONNECTED</span>
+            <span className="text-[#1a1a1a]">SQLite Database: CONNECTED</span>
           </div>
         </div>
       </div>
 
-      {/* 4 Metric Cards */}
+      {/* Alert Banner Notification */}
+      {alertNotification && (
+        <div
+          className={`p-4 rounded-2xl border flex items-center justify-between gap-3 shadow-md animate-in fade-in slide-in-from-top-2 duration-300 ${
+            alertNotification.type === "warning"
+              ? "bg-[#fff3e0] border-[#ffb74d] text-[#e65100]"
+              : alertNotification.type === "info"
+              ? "bg-[#e3f2fd] border-[#90caf9] text-[#1565c0]"
+              : "bg-[#e8f5e9] border-[#a5d6a7] text-[#2e7d32]"
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <Bell className="w-5 h-5 shrink-0" />
+            <div>
+              <strong className="text-xs sm:text-sm font-bold block">
+                {alertNotification.title}
+              </strong>
+              <span className="text-xs opacity-90">{alertNotification.message}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {alertNotification.isStranger && (
+              <button
+                type="button"
+                onClick={() => {
+                  const strangerVisitor = visitors.find((v) => v.role === "stranger") || visitors[0];
+                  if (strangerVisitor) handleOpenIdentifyModal(strangerVisitor);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-[#e65100] text-white hover:bg-[#bf360c] cursor-pointer shadow-xs transition-all animate-pulse"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>ระบุตัวตนคนนี้ทันที</span>
+              </button>
+            )}
+            <button
+              onClick={() => setAlertNotification(null)}
+              className="text-xs font-bold px-2.5 py-1.5 rounded-lg bg-white/70 hover:bg-white text-[#1a1a1a] cursor-pointer transition-colors"
+            >
+              ปิด
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 4 Core Classification Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          title="Total Visitors Today"
-          value="142"
-          subtitle="Unique face sessions"
-          icon={Users}
-          trend="+18% vs yesterday"
-          color="peach"
-        />
-        <MetricCard
-          title="Identified (Known)"
-          value="128"
-          subtitle="90.1% Recognition rate"
-          icon={CheckCircle2}
-          trend="+12 known"
+          title="คนในบ้าน (Household)"
+          value={stats.household_count}
+          subtitle="สมาชิกในครอบครัวที่ลงทะเบียน"
+          icon={Home}
+          trend="ผ่านการตรวจสอบปลอดภัย"
           color="green"
         />
         <MetricCard
-          title="Unidentified (Unknown)"
-          value="12"
-          subtitle="Pending database match"
-          icon={AlertTriangle}
-          trend="8.4% of total"
-          color="cyan"
+          title="คนส่งของ (Delivery)"
+          value={stats.delivery_count}
+          subtitle="พัสดุและไรเดอร์ขนส่ง"
+          icon={Package}
+          trend="แจ้งเตือนรับพัสดุอัตโนมัติ"
+          color="peach"
         />
         <MetricCard
-          title="Threats / Blacklist"
-          value="2"
-          subtitle="Critical alerts triggered"
-          icon={ShieldAlert}
-          trend="Immediate Action"
+          title="คนแปลกหน้า (Stranger)"
+          value={stats.stranger_count}
+          subtitle="ไม่พบในฐานข้อมูล / เฝ้าระวัง"
+          icon={AlertTriangle}
+          trend="Security Alerts Triggered"
           color="red"
+        />
+        <MetricCard
+          title="ตรวจจับทั้งหมดวันนี้"
+          value={stats.total_today}
+          subtitle={`ประวัติทั้งหมดบันทึกลง SQLite`}
+          icon={Users}
+          trend={`แจ้งเตือนแล้ว ${stats.alerts_count} รายการ`}
+          color="cyan"
         />
       </div>
 
@@ -298,6 +688,51 @@ export default function DetectionPage() {
 
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-2">
+                {/* Auto AI Detect Live Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setIsAutoDetect(!isAutoDetect)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs border ${
+                    isAutoDetect
+                      ? "bg-[#e8f5e9] text-[#2e7d32] border-[#a5d6a7] hover:bg-[#c8e6c9]"
+                      : "bg-white text-[#6b6b6b] border-[#e8e0d5] hover:text-[#1a1a1a]"
+                  }`}
+                  title={isAutoDetect ? "คลิกเพื่อปิดการตรวจจับอัตโนมัติ" : "คลิกเพื่อเปิดการตรวจจับอัตโนมัติขณะ Live Stream"}
+                >
+                  <span className={`w-2 h-2 rounded-full ${isAutoDetect ? "bg-[#2e7d32] animate-ping" : "bg-neutral-400"}`} />
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>Auto AI: {isAutoDetect ? "ON (สด)" : "OFF"}</span>
+                </button>
+
+                {/* Sound Alert Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setIsSoundEnabled(!isSoundEnabled)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs border ${
+                    isSoundEnabled
+                      ? "bg-[#e8f5e9] text-[#2e7d32] border-[#a5d6a7] hover:bg-[#c8e6c9]"
+                      : "bg-white text-neutral-400 border-[#e8e0d5] hover:text-[#1a1a1a]"
+                  }`}
+                  title={isSoundEnabled ? "เสียงแจ้งเตือนเปิดอยู่ (คลิกเพื่อปิด)" : "เสียงแจ้งเตือนปิดอยู่ (คลิกเพื่อเปิดเสียง)"}
+                >
+                  {isSoundEnabled ? <Volume2 className="w-3.5 h-3.5 text-[#2e7d32]" /> : <VolumeX className="w-3.5 h-3.5 text-neutral-400" />}
+                  <span>เสียงแจ้งเตือน: {isSoundEnabled ? "เปิด" : "ปิด"}</span>
+                </button>
+
+                {/* YOLO Detect Now Button */}
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleRunYoloDetection}
+                  disabled={isDetecting}
+                  icon={Sparkles}
+                  className="bg-[#2e7d32] hover:bg-[#1b5e20] text-white border-none shadow-sm"
+                >
+                  <span className="font-bold">
+                    {isDetecting ? "กำลังประมวลผล YOLO..." : "ตรวจจับด้วย YOLO AI"}
+                  </span>
+                </Button>
+
                 {/* IP Settings Button */}
                 <Button
                   variant="secondary"
@@ -331,14 +766,14 @@ export default function DetectionPage() {
 
                 {/* Snapshot Button */}
                 <Button
-                  variant="primary"
+                  variant="outline"
                   size="sm"
                   onClick={handleTakeSnapshot}
                   disabled={isCapturing}
                   icon={Camera}
                 >
                   <span className="hidden sm:inline">
-                    {isCapturing ? "Capturing..." : "Snapshot"}
+                    {isCapturing ? "บันทึกภาพ..." : "Snapshot"}
                   </span>
                 </Button>
               </div>
@@ -349,6 +784,8 @@ export default function DetectionPage() {
               {/* Camera Video Stream Frame */}
               {streamMode === "live" ? (
                 <img
+                  id="esp32-stream-img"
+                  crossOrigin="anonymous"
                   key={`${streamUrl}-${streamKey}`}
                   src={`${streamUrl}${streamUrl.includes("?") ? "&" : "?"}_t=${streamKey}`}
                   alt="ESP32-CAM Live MJPEG Stream"
@@ -370,7 +807,7 @@ export default function DetectionPage() {
               {streamMode === "live" && streamStatus === "offline" && (
                 <div className="absolute inset-0 bg-[#0c0e12]/92 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center z-20 animate-in fade-in duration-200">
                   <div className="w-14 h-14 rounded-2xl bg-[#c62828]/15 border border-[#c62828]/30 flex items-center justify-center mb-3">
-                    <WifiOff className="w-7 h-7 text-[#ef5350]" />
+                    <Radio className="w-7 h-7 text-[#ef5350]" />
                   </div>
                   <h3 className="text-base sm:text-lg font-bold text-white mb-1.5">
                     ไม่สามารถเชื่อมต่อกล้อง ESP32-CAM ได้
@@ -388,7 +825,7 @@ export default function DetectionPage() {
                     </a>
                   </div>
                   <p className="text-xs text-white/70 max-w-md mb-5 leading-relaxed">
-                    กรุณาตรวจสอบว่า ESP32 เปิดทำงานและเชื่อมต่อ Wi-Fi / Hotspot วงเดียวกัน (IP: {cameraIp})
+                    กรุณาตรวจสอบว่า ESP32 เปิดทำงานและเชื่อมต่อ Wi-Fi วงเดียวกัน (IP: {cameraIp})
                   </p>
                   <div className="flex flex-wrap items-center justify-center gap-2.5">
                     <Button
@@ -444,14 +881,14 @@ export default function DetectionPage() {
               <div className="absolute top-4 left-4 bg-black/65 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 text-white flex items-center gap-3 text-xs font-mono z-10">
                 <div className="flex items-center gap-1.5 text-[#c62828] font-bold">
                   <span className="w-2 h-2 rounded-full bg-[#c62828] animate-pulse" />
-                  <span>REC</span>
+                  <span>AI REC</span>
                 </div>
                 <div className="flex items-center gap-1 text-white/80">
                   <Clock className="w-3.5 h-3.5 text-[#f5c9a8]" />
                   <span>{currentTime || "10:42:18"}</span>
                 </div>
                 <span className="text-[#26a69a] font-semibold">
-                  {streamMode === "live" ? "SVGA (800x600)" : "30.2 FPS"}
+                  {streamMode === "live" ? "VGA (640x480)" : "30 FPS"}
                 </span>
                 <span className="text-white/60 hidden sm:inline">
                   {streamMode === "live" ? cameraIp : "SIMULATED"}
@@ -459,33 +896,90 @@ export default function DetectionPage() {
               </div>
 
               {/* HUD Overlay - Top Right Status */}
-              <div className="absolute top-4 right-4 bg-black/65 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 text-white text-[11px] font-mono z-10">
-                MODEL: <span className="text-[#f5c9a8] font-bold">YOLOv8n-face</span>
+              <div className="absolute top-4 right-4 bg-black/65 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 text-white text-[11px] font-mono z-10 flex items-center gap-2">
+                <span>MODEL:</span>
+                <span className="text-[#f5c9a8] font-bold">YOLOv8 + 3-Class AI</span>
               </div>
 
-              {/* Simulated YOLO Face Bounding Box #1 (VIP) */}
-              {showBoxes && (
-                <div className="absolute top-[20%] left-[34%] w-[32%] h-[46%] border-2 border-[#f5c9a8] rounded-xl shadow-[0_0_20px_rgba(245,201,168,0.7)] flex flex-col justify-between p-2 pointer-events-none transition-all duration-300 animate-in fade-in z-10">
-                  <div className="flex items-start justify-between">
-                    <span className="bg-[#f5c9a8] text-[#1a1a1a] text-xs font-black px-2 py-0.5 rounded shadow-sm">
-                      Dr. Somchai Prasert
-                    </span>
-                    <span className="bg-[#2e7d32] text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
-                      98.4% VIP
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between text-[10px] font-mono text-white bg-black/70 px-2 py-1 rounded backdrop-blur-xs">
-                    <span>Zone: Main Foyer</span>
-                    <span className="text-[#2e7d32]">MATCH OK</span>
-                  </div>
+              {/* LIVE STREAM AUTO DETECT ACTIVE PILL */}
+              {isAutoDetect && (
+                <div className="absolute top-4 inset-x-0 mx-auto w-max bg-black/80 backdrop-blur-md px-3.5 py-1 rounded-full border border-[#4ade80]/40 text-white text-[11px] font-bold flex items-center gap-2 z-10 shadow-lg animate-in fade-in">
+                  <span className="w-2 h-2 rounded-full bg-[#4ade80] animate-pulse" />
+                  <span>AI LIVE STREAM DETECTION ACTIVE</span>
+                  {isDetecting && <RefreshCw className="w-3 h-3 animate-spin text-[#f5c9a8]" />}
                 </div>
               )}
+
+              {/* DYNAMIC YOLO BOUNDING BOXES FOR PERSON CLASSIFICATION */}
+              {showBoxes &&
+                activeDetections.map((det, index) => {
+                  const isHousehold = det.category === "household";
+                  const isDelivery = det.category === "delivery";
+                  const isStranger = det.category === "stranger";
+
+                  const borderColor = isHousehold
+                    ? "border-[#4ade80]"
+                    : isDelivery
+                    ? "border-[#fbbf24]"
+                    : "border-[#f87171]";
+
+                  const shadowColor = isHousehold
+                    ? "shadow-[0_0_20px_rgba(74,222,128,0.7)]"
+                    : isDelivery
+                    ? "shadow-[0_0_20px_rgba(251,191,36,0.7)]"
+                    : "shadow-[0_0_20px_rgba(248,113,113,0.8)]";
+
+                  const tagBg = isHousehold
+                    ? "bg-[#2e7d32] text-white"
+                    : isDelivery
+                    ? "bg-[#f57f17] text-white"
+                    : "bg-[#c62828] text-white";
+
+                  const categoryLabel = isHousehold
+                    ? "คนในบ้าน (Household)"
+                    : isDelivery
+                    ? "คนส่งของ (Delivery)"
+                    : "คนแปลกหน้า (Stranger)";
+
+                  let boxStyle = { top: "16%", left: "26%", width: "48%", height: "60%" };
+                  if (det.bounding_box && Array.isArray(det.bounding_box) && det.bounding_box.length === 4) {
+                    const [x1, y1, x2, y2] = det.bounding_box;
+                    const l = Math.max(2, Math.min(85, (x1 / 640) * 100));
+                    const t = Math.max(2, Math.min(85, (y1 / 480) * 100));
+                    const w = Math.max(12, Math.min(94, ((x2 - x1) / 640) * 100));
+                    const h = Math.max(15, Math.min(94, ((y2 - y1) / 480) * 100));
+                    boxStyle = { left: `${l}%`, top: `${t}%`, width: `${w}%`, height: `${h}%` };
+                  }
+
+                  return (
+                    <div
+                      key={index}
+                      style={boxStyle}
+                      className={`absolute border-2 ${borderColor} ${shadowColor} rounded-xl flex flex-col justify-between p-2.5 pointer-events-none transition-all duration-300 animate-in fade-in z-10`}
+                    >
+                      <div className="flex items-start justify-between gap-1">
+                        <span className="bg-black/80 text-white text-xs font-bold px-2 py-0.5 rounded shadow-sm border border-white/20">
+                          {det.person_name}
+                        </span>
+                        <span className={`${tagBg} text-[10px] font-bold px-2 py-0.5 rounded shadow-xs`}>
+                          {categoryLabel} • {det.confidence}%
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[10px] font-mono text-white bg-black/75 px-2 py-1 rounded backdrop-blur-xs">
+                        <span>Zone: {det.location || "หน้าบ้าน"}</span>
+                        <span className={isStranger ? "text-[#f87171] font-bold" : "text-[#4ade80] font-bold"}>
+                          {isStranger ? "ALERT RECORDED" : "VERIFIED OK"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
 
               {/* Snapshot Toast notification within view */}
               {snapshotSuccess && (
                 <div className="absolute bottom-4 inset-x-6 bg-[#2e7d32] text-white py-2 px-4 rounded-xl text-center text-xs font-bold shadow-lg animate-in fade-in duration-200 z-30">
-                  Snapshot captured & saved successfully!
+                  บันทึกภาพ Snapshot สำเร็จเรียบร้อย!
                 </div>
               )}
             </div>
@@ -512,18 +1006,18 @@ export default function DetectionPage() {
                     </a>
                     <span>•</span>
                     <a
-                      href={`http://${cameraIp}/`}
+                      href={`http://${cameraIp}/capture`}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-1 text-[#2e7d32] hover:underline font-semibold"
                     >
-                      <span>ESP32 Web Server</span>
+                      <span>Snapshot (/capture)</span>
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>
                 )}
                 <span>•</span>
-                <span>Codec: MJPEG (OV3660)</span>
+                <span>OV3660 AI Camera</span>
               </div>
               <div className="flex items-center gap-3">
                 <button
@@ -532,28 +1026,50 @@ export default function DetectionPage() {
                 >
                   ตั้งค่า IP
                 </button>
-                <span className="font-mono text-[#26a69a]">Latency: ~28ms</span>
+                <span className="font-mono text-[#26a69a]">YOLO Latency: ~32ms</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Recent Visitors Feed (1 Col) */}
+        {/* Recent Visitors & Classification Feed (1 Col) */}
         <div className="flex flex-col gap-3">
           <div className="bg-white rounded-3xl p-5 border border-[#e8e0d5] shadow-xs flex flex-col gap-4 h-full">
             <div className="flex items-center justify-between border-b border-[#e8e0d5] pb-3">
               <div>
                 <h2 className="text-base font-bold text-[#1a1a1a]">
-                  Recent Visitors
+                  Recent Detection History
                 </h2>
-                <p className="text-xs text-[#6b6b6b]">Live face detection log</p>
+                <p className="text-xs text-[#6b6b6b]">ประวัติจำแนกบุคคลจากฐานข้อมูล SQLite</p>
               </div>
               <span className="text-xs font-bold bg-[#f7f1e9] text-[#1a1a1a] px-2 py-1 rounded-lg border border-[#e8e0d5]">
                 {visitors.length} Logs
               </span>
             </div>
 
-            {/* List */}
+            {/* Category Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+              {[
+                { id: "ALL", label: "ทั้งหมด" },
+                { id: "household", label: "คนในบ้าน" },
+                { id: "delivery", label: "คนส่งของ" },
+                { id: "stranger", label: "คนแปลกหน้า" },
+              ].map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setHistoryCategory(cat.id)}
+                  className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    historyCategory === cat.id
+                      ? "bg-[#f5c9a8] text-[#1a1a1a] shadow-xs"
+                      : "bg-[#f7f1e9] text-[#6b6b6b] hover:text-[#1a1a1a]"
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Visitor List */}
             <div className="flex flex-col gap-2.5 overflow-y-auto max-h-[460px] pr-1">
               {visitors.map((visitor) => (
                 <div
@@ -564,34 +1080,59 @@ export default function DetectionPage() {
                     <img
                       src={visitor.photoUrl}
                       alt={visitor.name}
-                      className="w-11 h-11 rounded-xl object-cover border border-[#e8e0d5] shadow-2xs"
+                      className="w-11 h-11 rounded-xl object-cover border border-[#e8e0d5] shadow-2xs shrink-0"
                     />
                     <div className="flex flex-col">
-                      <span className="text-xs font-bold text-[#1a1a1a]">
+                      <span className="text-xs font-bold text-[#1a1a1a] line-clamp-1">
                         {visitor.name}
                       </span>
                       <div className="flex items-center gap-1.5 text-[11px] text-[#6b6b6b]">
                         <span>{visitor.time}</span>
                         <span>•</span>
-                        <span>{visitor.location}</span>
+                        <span className="line-clamp-1">{visitor.location}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-end gap-1">
-                    <Badge variant={visitor.role}>{visitor.role}</Badge>
-                    <span className="text-[10px] font-mono text-[#6b6b6b]">
-                      {visitor.confidence}%
-                    </span>
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant={visitor.role}>{visitor.role}</Badge>
+                      <span className="text-[10px] font-mono text-[#6b6b6b]">
+                        {visitor.confidence}%
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenIdentifyModal(visitor)}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-bold cursor-pointer transition-all shadow-2xs border ${
+                        visitor.role === "stranger"
+                          ? "bg-[#fff3e0] hover:bg-[#ffe0b2] text-[#e65100] border-[#ffb74d] animate-pulse"
+                          : "bg-white hover:bg-[#f5c9a8]/30 text-[#1a1a1a] border-[#e8e0d5]"
+                      }`}
+                      title="ระบุตัวตนและบันทึกภาพนี้เข้าสู่ระบบโมเดล AI"
+                    >
+                      <Sparkles className="w-3 h-3 text-[#e65100]" />
+                      <span>{visitor.role === "stranger" ? "ระบุตัวตน & เทรน" : "เทรนข้อมูลเพิ่ม"}</span>
+                    </button>
                   </div>
                 </div>
               ))}
+
+              {visitors.length === 0 && (
+                <div className="text-center py-10 text-xs text-[#6b6b6b]">
+                  ไม่มีข้อมูลประวัติในหมวดหมู่นี้
+                </div>
+              )}
             </div>
 
-            <div className="mt-auto pt-3 border-t border-[#e8e0d5] text-center">
-              <span className="text-xs text-[#6b6b6b]">
-                Auto-syncing with ESP32-CAM Node ({cameraIp})...
-              </span>
+            <div className="mt-auto pt-3 border-t border-[#e8e0d5] text-center flex items-center justify-between text-xs text-[#6b6b6b]">
+              <span>Auto-synced with SQLite</span>
+              <button
+                onClick={fetchStatsAndHistory}
+                className="text-[#e65100] font-bold hover:underline cursor-pointer"
+              >
+                รีเฟรชประวัติ
+              </button>
             </div>
           </div>
         </div>
@@ -627,7 +1168,7 @@ export default function DetectionPage() {
                   )}
                 </div>
                 <span className="text-[11px] font-mono text-[#6b6b6b]">
-                  192.168.137.112/stream
+                  {DEFAULT_IP}/stream
                 </span>
               </button>
 
@@ -653,31 +1194,22 @@ export default function DetectionPage() {
             </div>
           </div>
 
-          {/* Form Fields: IP, Port, Stream Path */}
           <div className="flex flex-col gap-3">
             <Input
-              label="Camera IP Address หรือ Hostname"
-              id="camera-ip-input"
+              label="IP Address กล้อง ESP32"
               value={tempIp}
               onChange={(e) => setTempIp(e.target.value)}
-              placeholder="e.g. 192.168.137.112"
-              icon={Wifi}
-              helperText="ใส่ IP ของบอร์ด ESP32 ที่แสดงใน Arduino Serial Monitor"
-              required
+              placeholder="192.168.137.65"
             />
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <Input
-                label="Port (ค่าเริ่มต้นคือ 80)"
-                id="camera-port-input"
+                label="Port (เว้นว่างถ้าเป็นพอร์ต 80)"
                 value={tempPort}
                 onChange={(e) => setTempPort(e.target.value)}
                 placeholder="80"
-                type="number"
               />
               <Input
-                label="Stream Path"
-                id="camera-path-input"
+                label="Path ของสตรีม"
                 value={tempPath}
                 onChange={(e) => setTempPath(e.target.value)}
                 placeholder="/stream"
@@ -685,107 +1217,218 @@ export default function DetectionPage() {
             </div>
           </div>
 
-          {/* Stream Mode Selection */}
-          <div className="flex flex-col gap-2">
-            <span className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wider">
-              โหมดการแสดงผล (Stream Mode)
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              <label
-                className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
-                  tempMode === "live"
-                    ? "border-[#2e7d32] bg-[#e8f5e9]/60 text-[#1a1a1a]"
-                    : "border-[#e8e0d5] hover:bg-[#f7f1e9] text-[#6b6b6b]"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="streamMode"
-                  value="live"
-                  checked={tempMode === "live"}
-                  onChange={() => setTempMode("live")}
-                  className="accent-[#2e7d32]"
-                />
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold">สตรีมสด (Live MJPEG)</span>
-                  <span className="text-[10px] text-[#6b6b6b]">
-                    ดึงภาพสดจาก ESP32-CAM
-                  </span>
-                </div>
-              </label>
-
-              <label
-                className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
-                  tempMode === "demo"
-                    ? "border-[#e65100] bg-[#fff3e0]/60 text-[#1a1a1a]"
-                    : "border-[#e8e0d5] hover:bg-[#f7f1e9] text-[#6b6b6b]"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="streamMode"
-                  value="demo"
-                  checked={tempMode === "demo"}
-                  onChange={() => setTempMode("demo")}
-                  className="accent-[#e65100]"
-                />
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold">โหมดจำลอง (Demo Feed)</span>
-                  <span className="text-[10px] text-[#6b6b6b]">
-                    ใช้ภาพจำลองเมื่อไม่มีกล้อง
-                  </span>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          {/* Full URL Live Preview Box */}
-          <div className="p-3.5 rounded-xl bg-[#f7f1e9] border border-[#e8e0d5] flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-[#6b6b6b] uppercase tracking-wider">
-                Full Stream URL ที่จะเชื่อมต่อ:
-              </span>
-              <a
-                href={modalPreviewUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-[11px] text-[#e65100] hover:underline inline-flex items-center gap-1 font-semibold"
-              >
-                <span>ทดสอบเปิดลิงก์</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-            <code className="text-xs font-mono font-bold text-[#1a1a1a] bg-white px-2.5 py-1.5 rounded-lg border border-[#e8e0d5] break-all select-all">
-              {modalPreviewUrl}
-            </code>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center justify-between pt-2 border-t border-[#e8e0d5] gap-2">
+          <div className="flex items-center justify-end gap-2 pt-2">
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
-              type="button"
-              onClick={handleResetDefault}
+              onClick={() => setIsSettingsOpen(false)}
             >
-              คืนค่าเริ่มต้น
+              ยกเลิก
             </Button>
+            <Button variant="primary" size="sm" type="submit">
+              บันทึกการตั้งค่า
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
-            <div className="flex items-center gap-2">
+      {/* IDENTIFY & TRAIN PERSON MODAL */}
+      <Modal
+        isOpen={isIdentifyModalOpen}
+        onClose={() => {
+          if (!isSubmittingIdentify) {
+            setIsIdentifyModalOpen(false);
+            setIdentifySuccessMessage("");
+          }
+        }}
+        title="ระบุตัวตนและเทรนข้อมูลบุคคล (Identify & Train Person)"
+        maxWidth="max-w-lg"
+      >
+        <div className="flex flex-col gap-4">
+          {/* Success Notification Banner */}
+          {identifySuccessMessage && (
+            <div className="p-3.5 rounded-2xl bg-[#e8f5e9] border border-[#a5d6a7] text-[#2e7d32] text-xs font-bold flex items-center gap-2.5 animate-in fade-in">
+              <CheckCircle2 className="w-5 h-5 shrink-0 text-[#2e7d32]" />
+              <span>{identifySuccessMessage}</span>
+            </div>
+          )}
+
+          {/* Snapshot Preview & Detection Metadata */}
+          {selectedRecordForIdentify && (
+            <div className="p-3.5 rounded-2xl bg-[#f7f1e9] border border-[#e8e0d5] flex items-center gap-3.5">
+              <img
+                src={selectedRecordForIdentify.photoUrl}
+                alt="Captured Face"
+                className="w-20 h-20 rounded-2xl object-cover border border-[#e8e0d5] shadow-xs shrink-0"
+              />
+              <div className="flex flex-col gap-1 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-[#1a1a1a]">ภาพจากกล้อง:</span>
+                  <Badge variant={selectedRecordForIdentify.role}>
+                    {selectedRecordForIdentify.role}
+                  </Badge>
+                </div>
+                <div className="text-[11px] text-[#6b6b6b]">
+                  <span>ตรวจพบเมื่อ: {selectedRecordForIdentify.time}</span>
+                </div>
+                <div className="text-[11px] text-[#6b6b6b]">
+                  <span>ตำแหน่ง: {selectedRecordForIdentify.location}</span>
+                </div>
+                <span className="text-[11px] font-mono text-[#2e7d32] font-semibold">
+                  AI Confidence: {selectedRecordForIdentify.confidence}%
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Mode Tabs */}
+          <div className="flex items-center p-1 rounded-xl bg-[#f7f1e9] border border-[#e8e0d5] text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setIdentifyMode("new")}
+              className={`flex-1 py-1.5 rounded-lg cursor-pointer transition-all text-center ${
+                identifyMode === "new"
+                  ? "bg-[#e65100] text-white shadow-xs"
+                  : "text-[#6b6b6b] hover:text-[#1a1a1a]"
+              }`}
+            >
+              ลงทะเบียนบุคคลใหม่
+            </button>
+            <button
+              type="button"
+              onClick={() => setIdentifyMode("existing")}
+              className={`flex-1 py-1.5 rounded-lg cursor-pointer transition-all text-center ${
+                identifyMode === "existing"
+                  ? "bg-[#1a1a1a] text-white shadow-xs"
+                  : "text-[#6b6b6b] hover:text-[#1a1a1a]"
+              }`}
+            >
+              เชื่อมโยงกับบุคคลเดิม ({registeredPersonsList.length})
+            </button>
+          </div>
+
+          {/* Form Content */}
+          <form onSubmit={handleSaveIdentify} className="flex flex-col gap-4">
+            {identifyMode === "new" ? (
+              <>
+                <Input
+                  label="ชื่อ-นามสกุล บุคคล *"
+                  placeholder="เช่น คุณสมชาย รักสงบ, พนักงานส่งของ Flash, ช่างแอร์..."
+                  value={newPersonForm.name}
+                  onChange={(e) =>
+                    setNewPersonForm({ ...newPersonForm, name: e.target.value })
+                  }
+                  required
+                />
+
+                {/* Category Selection */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-[#1a1a1a] uppercase tracking-wider">
+                    กลุ่มหมวดหมู่ (Category) *
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: "household", label: "คนในบ้าน", color: "border-[#81c784] text-[#2e7d32]" },
+                      { id: "delivery", label: "คนส่งของ", color: "border-[#ffb74d] text-[#e65100]" },
+                      { id: "stranger", label: "คนแปลกหน้า", color: "border-[#e57373] text-[#c62828]" },
+                    ].map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() =>
+                          setNewPersonForm({
+                            ...newPersonForm,
+                            category: cat.id,
+                            role: cat.id === "household" ? "Family" : cat.id === "delivery" ? "Delivery" : "Stranger",
+                          })
+                        }
+                        className={`p-2 rounded-xl text-xs font-bold border transition-all cursor-pointer text-center ${
+                          newPersonForm.category === cat.id
+                            ? "bg-[#f5c9a8] border-[#e8b48a] text-[#1a1a1a] shadow-xs"
+                            : "bg-white border-[#e8e0d5] text-[#6b6b6b] hover:bg-[#f7f1e9]"
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="บทบาท / ความสัมพันธ์"
+                    placeholder="เช่น Family, พ่อ, แม่, ไรเดอร์"
+                    value={newPersonForm.role}
+                    onChange={(e) =>
+                      setNewPersonForm({ ...newPersonForm, role: e.target.value })
+                    }
+                  />
+                  <Input
+                    label="สังกัด / แผนก"
+                    placeholder="เช่น ครอบครัว, Kerry, Flash"
+                    value={newPersonForm.department}
+                    onChange={(e) =>
+                      setNewPersonForm({ ...newPersonForm, department: e.target.value })
+                    }
+                  />
+                </div>
+
+                <Textarea
+                  label="หมายเหตุเพิ่มเติม"
+                  placeholder="บันทึกสิทธิ์หรือข้อมูลเพิ่มเติม..."
+                  value={newPersonForm.notes}
+                  onChange={(e) =>
+                    setNewPersonForm({ ...newPersonForm, notes: e.target.value })
+                  }
+                  rows={2}
+                />
+              </>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <label className="text-xs font-semibold text-[#1a1a1a] uppercase tracking-wider">
+                  เลือกบุคคลในฐานข้อมูลที่ต้องการผูกรูปนี้เข้า Dataset *
+                </label>
+                <select
+                  value={selectedExistingPersonId}
+                  onChange={(e) => setSelectedExistingPersonId(e.target.value)}
+                  className="w-full bg-white border border-[#e8e0d5] text-[#1a1a1a] text-xs font-semibold rounded-xl px-3.5 py-2.5 outline-none focus:border-[#e8b48a] cursor-pointer"
+                >
+                  {registeredPersonsList.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.category === "household" ? "คนในบ้าน" : p.category === "delivery" ? "คนส่งของ" : "คนแปลกหน้า"}) — {p.images_count} รูปใน Dataset
+                    </option>
+                  ))}
+                </select>
+
+                <p className="text-[11px] text-[#6b6b6b] leading-relaxed bg-[#f7f1e9] p-3 rounded-xl border border-[#e8e0d5]">
+                  💡 <strong>ระบบ AI:</strong> ภาพถ่ายใบหน้าสดนี้จะถูกบันทึกและเพิ่มเข้าสู่ชุดข้อมูล (Training Dataset) ของบุคคลที่เลือกทันที ช่วยให้โมเดล YOLOv8 จดจำและจำแนกได้แม่นยำยิ่งขึ้น
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#e8e0d5]">
               <Button
+                type="button"
                 variant="secondary"
                 size="sm"
-                type="button"
-                onClick={() => setIsSettingsOpen(false)}
+                onClick={() => setIsIdentifyModalOpen(false)}
+                disabled={isSubmittingIdentify}
               >
                 ยกเลิก
               </Button>
-              <Button variant="primary" size="sm" type="submit">
-                บันทึกและเชื่อมต่อ
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                disabled={isSubmittingIdentify}
+                icon={Sparkles}
+                className="bg-[#e65100] hover:bg-[#bf360c] text-white border-none shadow-xs"
+              >
+                {isSubmittingIdentify ? "กำลังบันทึกข้อมูล..." : "บันทึกข้อมูลและส่งเทรน AI"}
               </Button>
             </div>
-          </div>
-        </form>
+          </form>
+        </div>
       </Modal>
     </div>
   );

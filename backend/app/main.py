@@ -1,6 +1,8 @@
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.api import api_router
 from app.core.config import settings
@@ -9,7 +11,7 @@ from app.core.database import init_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: initialize database tables
+    # Startup: initialize database tables and seed initial data
     init_db()
     yield
     # Shutdown: clean up if needed
@@ -35,6 +37,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount snapshots & datasets directories for static image serving
+data_base_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+snapshots_dir = os.path.join(data_base_dir, "snapshots")
+datasets_dir = os.path.join(data_base_dir, "datasets")
+os.makedirs(snapshots_dir, exist_ok=True)
+os.makedirs(datasets_dir, exist_ok=True)
+app.mount("/data/snapshots", StaticFiles(directory=snapshots_dir), name="snapshots")
+app.mount("/data/datasets", StaticFiles(directory=datasets_dir), name="datasets")
 
 
 @app.get("/", tags=["Root"])

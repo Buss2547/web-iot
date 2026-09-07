@@ -271,3 +271,101 @@ export const signup = async ({ name, email, password, role }) => {
 3. **CORS Protection:** กำหนด Origin ที่อนุญาตอย่างเจาะจง (`BACKEND_CORS_ORIGINS`) เพื่อป้องกันการเรียกข้ามโดเมนที่ไม่ได้รับอนุญาต
 4. **Data Validation:** ใช้ Pydantic V2 ตรวจสอบชนิดข้อมูล ความยาว และรูปแบบอีเมลในทุก Endpoint
 5. **SQLite Thread Safety:** ตั้งค่า `check_same_thread=False` รองรับการทำงานแบบ Concurrency ของ FastAPI Worker
+
+---
+
+## 7. ระบบเทรนและจดจำใบหน้าสำหรับใช้งานจริง (Real-World Face Training & Embedding Pipeline)
+
+ระบบจดจำใบหน้าของ Vigil ได้รับการออกแบบให้**ใช้งานได้จริงในสภาวะแวดล้อม IoT** โดยใช้เทคนิค **Metric Learning & Deep Feature Embeddings** ร่วมกับ **Ultralytics YOLOv8**:
+
+```mermaid
+flowchart LR
+    A["ESP32-CAM / Webcam"] -->|MJPEG / Snapshot| B["YOLOv8 Person Detection"]
+    B -->|Bounding Box Crop| C["Head & Face Alignment"]
+    C -->|Augmented Images| D["MobileNetV3 Feature Extractor"]
+    D -->|576-dim L2 Vector| E["Vector Similarity Matching"]
+    E -->|Cosine Sim >= 0.58| F["Known Identity (Household/Delivery)"]
+    E -->|Cosine Sim < 0.58| G["Unknown Stranger (Alert Trigger)"]
+```
+
+### 7.1 ทำไมต้องใช้ Metric Learning แทนการเทรน YOLO ใหม่ทุกครั้ง?
+1. **ความเร็วระดับมิลลิวินาที (<150ms):** เมื่อลงทะเบียนบุคคลใหม่หรือกด Re-train ระบบคำนวณเวกเตอร์ใบหน้าได้ทันที ไม่ต้องรอ Fine-tune YOLO นานหลายชั่วโมง
+2. **ประหยัดทรัพยากร:** สามารถประมวลผลบน CPU ทั่วไป หรือคอมพิวเตอร์ขนาดเล็ก (Mini-PC, Raspberry Pi) ได้อย่างลื่นไหลโดยไม่ต้องพึ่งพา GPU ราคาแพง
+3. **รองรับ One-Shot / Few-Shot Learning:** แม้มีภาพถ่ายเพียง 3-5 ภาพ ก็สามารถสร้างเวกเตอร์แทนตัวตนที่มีความแม่นยำสูงได้ทันที
+
+### 7.2 โครงสร้างการจัดเก็บ Dataset บนดิสก์
+ไฟล์ภาพใบหน้าจริงของผู้ใช้งานจะถูกจัดเก็บแยกตามบุคคลอย่างเป็นระเบียบ:
+```text
+backend/data/
+├── datasets/
+│   ├── person_8/
+│   │   ├── face_1788703468_0_a1b2.jpg
+│   │   └── face_1788703468_1_c3d4.jpg
+│   ├── person_10/
+│   │   ├── face_1788705124_0_e5f6.jpg
+│   │   └── face_1788705124_1_g7h8.jpg
+├── snapshots/                # ภาพ Snapshot ที่จับได้จากกล้องและบันทึกประวัติ
+├── face_embeddings.json      # ฐานข้อมูลเวกเตอร์ 576 มิติ L2-normalized
+├── training_status.json      # ประวัติสถานะโมเดลและ Log การเทรนแบบ Real-time
+└── vigil.db                  # ฐานข้อมูล SQLite (Users, Persons, Alerts, History)
+```
+
+### 7.3 เทคนิค Data Augmentation & Centroid Normalization
+เพื่อให้จำใบหน้าได้แม่นยำแม้คนจะเอียงหน้าหรือหันข้าง:
+- **Horizontal Mirroring:** ทำการกลับด้านภาพซ้าย-ขวาเสมือนจริงเพื่อสร้างเวกเตอร์เสริม
+- **Mean Centroid Vector:** หาจุดศูนย์กลางของเวกเตอร์ภาพทั้งหมดของบุคคลนั้น และคำนวณ $L_2$ Normalization:
+  $$\vec{v}_{\text{norm}} = \frac{\sum_{i=1}^n \vec{v}_i}{\|\sum_{i=1}^n \vec{v}_i\|_2}$$
+- **Intra-class Consistency:** คำนวณความสม่ำเสมอของภาพในคลาสเดียวกันด้วย Pairwise Cosine Similarity
+
+### 7.4 รายละเอียด API Endpoints สำหรับระบบเทรน AI
+
+| Method | Endpoint | คำอธิบาย |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/persons/model-status` | ดูสถานะโมเดล ความแม่นยำเฉลี่ย จำนวนโปรไฟล์ และ Log ล่าสุด |
+| `POST` | `/api/v1/persons/train` | สั่ง Re-train และ Re-index เวกเตอร์ใบหน้าของทุกคนในระบบแบบ Real-time |
+| `POST` | `/api/v1/persons/retrain` | Alias สำหรับสั่ง Re-train โมเดล |
+| `GET` | `/api/v1/persons/embeddings/summary` | ดูสรุปรายชื่อบุคคลและจำนวนภาพที่เทรนไว้ในฐานข้อมูลเวกเตอร์ |
+| `POST` | `/api/v1/persons` | ลงทะเบียนบุคคลใหม่พร้อมบันทึกภาพถ่ายลง Dataset และเทรนอัตโนมัติ |
+| `DELETE` | `/api/v1/persons/{id}` | ลบข้อมูลบุคคล ลบไฟล์ภาพใน `datasets/` และลบเวกเตอร์ออกจากโมเดล |
+
+#### ตัวอย่างผลลัพธ์จาก `GET /api/v1/persons/model-status`
+```json
+{
+  "status": "ready",
+  "model_name": "MobileNetV3 + Cosine Metric Learning",
+  "last_trained": "2026-09-07T14:17:18.123456+00:00",
+  "total_persons": 10,
+  "total_samples": 12,
+  "average_accuracy": 99.4,
+  "loss": 0.008,
+  "inference_speed_ms": 13.8,
+  "elapsed_ms": 129,
+  "logs": [
+    "[14:17:18] [TRAINER] Starting Full Face Metric Retraining Pipeline...",
+    "[14:17:18] [MODEL] Initializing MobileNetV3-Small (576-dim L2 Metric Extractor)...",
+    "[14:17:18] [TRAINED] #10 bas (household): 1 images (2 augmented) | Intra-consistency: 99.5%",
+    "[14:17:18] [CENTROID] Normalized 10 person identity vectors into L2 space.",
+    "[14:17:18] [COMPLETE] Retraining finished in 129ms. Overall Accuracy: 99.4%."
+  ]
+}
+```
+
+---
+
+### 7.5 กลไกการตรวจจับและแจ้งเตือนอัตโนมัติแบบต่อเนื่อง (Continuous Detection & Alert Pipeline)
+
+เพื่อให้ระบบเฝ้าระวังและแจ้งเตือนทำงานได้จริงอย่างต่อเนื่อง 24/7 โดยไม่ค้างหรือหยุดแจ้งเตือน:
+
+1. **การแก้ปัญหา ESP32 Single-Thread Lock ด้วย Stream-Grab Fallback (`fetch_esp32_frame`):**
+   - กล้อง ESP32-CAM ทั่วไปใช้ไลบรารีเว็บเซิร์ฟเวอร์แบบแกนเดียว เมื่อหน้าเว็บเปิดดูวิดีโอแบบสด (`/stream`) ค้างไว้ บอร์ดจะบล็อกในลูปสตรีม ทำให้การยิงขอภาพนิ่งผ่าน `/capture` มักจะเกิด Timeout
+   - ระบบแก้ปัญหานี้ด้วยฟังก์ชัน `fetch_esp32_frame()` ใน `app/api/v1/endpoints/detection.py`:
+     - พยายามเรียก `/capture` ก่อน (Timeout 2.5s)
+     - หากเกิด Timeout หรือบอร์ดไม่ตอบสนอง ระบบจะสลับไปดึงภาพจาก `/stream` ดึงเฉพาะไบต์ภาพ JPEG แรกสุด (`0xFF 0xD8` ถึง `0xFF 0xD9`) ทันที ทำให้ได้ภาพสดเสมอและไม่ทำให้บอร์ดค้าง
+2. **การจำแนกประเภทและบันทึกการแจ้งเตือนลงฐานข้อมูล (`classify_and_record`):**
+   - ทุกครั้งที่ตรวจพบบุคคล ระบบจะประมวลผลผ่านโมเดล MobileNetV3 Feature Extractor เพื่อจับคู่เวกเตอร์กับฐานข้อมูลใบหน้า:
+     - **Unknown / Stranger:** แจ้งเตือนระดับ **High** พร้อมบันทึกภาพ Snapshot ลงโฟลเดอร์ `backend/data/snapshots/` และบันทึกลงตาราง `alerts` ใน SQLite
+     - **Delivery (พนักงานส่งของ):** แจ้งเตือนระดับ **Medium** เพื่อให้เจ้าหน้าที่ทราบว่ามีพัสดุมาส่ง
+     - **Household (คนในบ้าน):** บันทึกสถานะการเข้าถึง (Access Log) และบันทึกลง SQLite
+3. **การส่งต่อข้อมูลประวัติ (Real-time Event Dispatch):**
+   - บันทึกทุก Detection Event ลงในตาราง `detection_history` อย่างต่อเนื่อง ทำให้หน้าเว็บสามารถดึงประวัติและแสดงการแจ้งเตือนได้อย่างต่อเนื่องทุกรอบการตรวจจับ
+

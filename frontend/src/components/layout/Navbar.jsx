@@ -1,13 +1,33 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router";
 import { Shield, Camera, Database, Bell, UserPlus, LogIn, LogOut, User } from "lucide-react";
-import { initialAlerts } from "../../mocks/mockAlerts";
 import { useAuth } from "../../context/AuthContext";
+import { alertsApi } from "../../services/api";
 
 export default function Navbar() {
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
-  const unreadAlertsCount = initialAlerts.filter((a) => !a.isRead).length;
+  const [unreadAlertsCount, setUnreadAlertsCount] = useState(0);
+
+  const fetchUnreadCount = async () => {
+    try {
+      const count = await alertsApi.getUnreadCount();
+      setUnreadAlertsCount(count);
+    } catch {
+      // fallback silent
+    }
+  };
+
+  useEffect(() => {
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 8000);
+    const handleAlertsUpdated = () => fetchUnreadCount();
+    window.addEventListener("vigil-alerts-updated", handleAlertsUpdated);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("vigil-alerts-updated", handleAlertsUpdated);
+    };
+  }, []);
 
   const navLinks = [
     { name: "Live Detection", path: "/detection", icon: Camera },
@@ -77,10 +97,10 @@ export default function Navbar() {
         <div className="flex items-center gap-2 shrink-0">
           <Link
             to="/add-person"
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#f5c9a8] hover:bg-[#e8b48a] text-[#1a1a1a] transition-all shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#f5c9a8] hover:bg-[#e8b48a] text-[#1a1a1a] transition-all shadow-xs"
           >
             <UserPlus className="w-3.5 h-3.5" />
-            <span>Add Person</span>
+            <span className="hidden sm:inline">Add Person</span>
           </Link>
 
           {isAuthenticated ? (

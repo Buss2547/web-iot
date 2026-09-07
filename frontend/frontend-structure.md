@@ -252,12 +252,70 @@ export default router;
 
 ---
 
-## 6. แนวทางการเชื่อมต่อ IoT & AI Backend (Future Integration)
+## 6. การเชื่อมต่อระบบ IoT & AI Backend ที่ใช้งานจริง (Live Implementation)
 
-1. **ESP32-CAM Stream:**
-   - ใช้แท็ก `<img>` ที่ดึง URL สตรีมแบบ `http://<ESP32_IP>:81/stream` หรือเชื่อมผ่าน Backend API Proxy เพื่อรองรับ CORS และ HTTPS
-2. **WebSocket Real-time Telemetry:**
-   - ใช้ `useCameraStream` เปิดการเชื่อมต่อ WebSocket ไปยังเซิร์ฟเวอร์ AI เพื่อรับพิกัด Bounding Box `[x, y, w, h]`, ชื่อบุคคลที่จำแนกได้, และค่า FPS มาวาดทับลงบนจอภาพแบบเรียลไทม์
-3. **Dataset & Training API:**
-   - หน้า `/add-person` ส่ง `FormData` (รูปภาพ + ชื่อ + แท็ก) ไปยัง REST API endpoint `/api/v1/persons`
-   - หน้า `/training` มีปุ่ม Trigger เพื่อสั่งเริ่มกระบวนการ Retrain โมเดล YOLO และสตรีม Log ผ่าน Server-Sent Events (SSE) หรือ WebSocket
+1. **ESP32-S3 AI Camera (Static IP 192.168.137.65):**
+   - **Direct Stream:** เชื่อมต่อตรงผ่าน `http://192.168.137.65/stream` สำหรับความเร็วสูงสุด Low-Latency
+   - **Backend Proxy:** สตรีมผ่าน `/api/v1/detection/esp32-stream?camera_ip=192.168.137.65` เพื่อป้องกันปัญหา Private Network Access / CORS restrictions บน Chrome/Edge 100%
+   - **Single Snapshot Capture:** ดึงภาพ JPEG ผ่าน `/api/v1/detection/esp32-snapshot` สำหรับนำเข้าโมเดล YOLO และใช้บันทึกชุดข้อมูลเทรนใบหน้า
+2. **Backend Proxy & CORS Handling:**
+   - มีระบบ Fallback ถ่ายภาพและสตรีมผ่าน Backend เสมอเมื่อเปิดในเครือข่ายที่มีการบล็อกพอร์ต
+3. **Identity Dataset Storage:**
+   - รูปภาพทั้งหมดที่ถ่ายจาก ESP32 หรือเว็บแคมถูกส่งเข้า `/api/v1/persons` และบันทึกลงโฟลเดอร์ `backend/data/datasets/person_<id>/` บนเครื่องเซิร์ฟเวอร์อย่างถาวร
+
+---
+
+## 7. ระบบการเทรนใบหน้าจริงใน Frontend (Real Face Training & Dataset Pipeline)
+
+### 7.1 หน้าคอนโซล AI Training (`src/pages/training/TrainingPage.jsx`)
+- **Real-time Model Metrics:** ดึงข้อมูลสถิติจริงจาก `GET /api/v1/persons/model-status`
+  - สถาปัตยกรรมโมเดล: `MobileNetV3 + Cosine Metric Learning (576-dim L2)`
+  - ความแม่นยำเฉลี่ย: คำนวณจาก Intra-class Consistency ของรูปภาพจริง
+  - จำนวนโปรไฟล์ที่เทรนและจำนวนตัวอย่างภาพใน Dataset
+  - ความเร็ว Inference Time (~13-15 ms บน CPU)
+- **Interactive AI Training Terminal:**
+  - แสดง Log จริงจากระบบหลังบ้าน พร้อมการแยกสีตามประเภท Log (`[TRAINED]`, `[COMPLETE]`, `[WARN]`, `[SYSTEM]`)
+  - ปุ่ม **"เทรนโมเดลใหม่ (Re-train AI)"** สั่งการ `POST /api/v1/persons/train` เพื่อ Re-index เวกเตอร์ใบหน้าของทุกคนใหม่แบบเรียลไทม์
+  - ปุ่ม **Pause / Resume** สลับสถานะการตรวจจับใบหน้า
+- **Identity Management:**
+  - แสดงการ์ดบุคคลจริงจาก SQLite พร้อมสถานะความแม่นยำและจำนวนภาพใน Dataset
+  - ปุ่มลบบุคคล (`Trash2`) ที่จะลบข้อมูลทั้งใน SQLite, โฟลเดอร์ Dataset และฐานข้อมูลเวกเตอร์แบบถาวร
+
+### 7.2 หน้าลงทะเบียนและเก็บ Dataset ใบหน้า (`src/pages/add-person/AddPersonPage.jsx`)
+- **AI Face Training Quality Guide:**
+  - แถบแนะนำคุณภาพ Dataset แบบไดนามิกตามจำนวนภาพที่ถ่าย:
+    - *0 ภาพ:* ยังไม่มีภาพถ่าย
+    - *1-2 ภาพ:* ความพร้อมพื้นฐาน (แนะนำถ่ายเพิ่ม)
+    - *3-5 ภาพ:* ความพร้อมดีเยี่ยม (ครอบคลุมมุมมองมาตรฐาน แนะนำสำหรับการใช้งานจริง)
+    - *6+ ภาพ:* ความแม่นยำระดับสูงสุด (High Precision Embedding)
+  - แนะนำ 3 มุมมองสำคัญ: **หน้าตรง**, **หันซ้าย-ขวาเล็กน้อย (~15°)**, และ **ยิ้ม/สภาพแสงจริง**
+- **Multi-Source Capture & Burst Mode:**
+  - รองรับการจับภาพทั้งจาก **ESP32-S3 AI Camera** (`192.168.137.65`), **กล้องเว็บแคม**, และ **การอัปโหลดไฟล์**
+  - โหมดถ่ายรัวอัตโนมัติ (Burst Mode 3 shots) เพื่อให้ผู้ใช้หันหน้าเปลี่ยนมุมได้สะดวกขณะเก็บ Dataset
+- **Automatic Augmentation Pipeline:**
+  - เมื่อกดบันทึก Backend จะทำการ Mirror และ Normalize เวกเตอร์ เพื่อให้จำหน้าได้แม้เอียงมุมในการตรวจจับจริง
+
+---
+
+## 8. ระบบตรวจจับอัตโนมัติและการแจ้งเตือนแบบต่อเนื่อง (Continuous Detection & Alert System)
+
+### 8.1 การแก้ปัญหาการหยุดตรวจจับ (Continuous Auto-Detection Architecture)
+- **Persistent Interval via useRef Guard (`isDetectingRef`):**
+  - ใน `src/pages/detection/DetectionPage.jsx` การใช้ state `isDetecting` ใน Dependency Array ของ `useEffect` จะทำให้ timer ถูก `clearInterval` ทุกครั้งที่มีการอัปเดตสถานะตรวจจับ เป็นสาเหตุให้ระบบตรวจจับหยุดทำงานหลังจากทำงานไปเพียง 1-2 ครั้ง
+  - **การปรับปรุง:** ปรับมาใช้ `isDetectingRef = useRef(false)` เพื่อทำหน้าที่เป็น In-flight guard โดยไม่ทำให้ `useEffect` Re-mount หรือทำลาย Interval ทิ้ง ทำให้ตัวตั้งเวลา (Timer Interval 3s) ทำงานต่อเนื่องสม่ำเสมอไม่มีวันหยุด
+- **Zero-Latency Canvas Frame Capture:**
+  - เมื่อกล้องเปิด Live Stream (ESP32 หรือ WebCam) ฟังก์ชัน `handleRunYoloDetection` จะดึงภาพปัจจุบันจากองค์ประกอบ `<img id="esp32-stream-img">` หรือ `<video>` ผ่าน HTML5 Canvas
+  - แปลงภาพเป็น JPEG Blob ส่งไปยัง Endpoint `/api/v1/detection/detect-image` ทันที
+  - ประโยชน์:
+    1. **แก้ปัญหา ESP32 Single-threaded Hang:** ไม่แย่ง Connection กับบอร์ด ESP32 ที่กำลังสตรีม MJPEG อยู่
+    2. **Real-time Synchronization:** ภาพที่ส่งไปตรวจจับคือภาพเดียวกับที่ปรากฏบนจอ 100%
+    3. **ความเร็วสูง:** ลดเวลา Round-trip Network Latency
+
+### 8.2 ระบบเสียงเตือนอัตโนมัติ (Web Audio API Chimes)
+- หน้าตรวจจับติดตั้ง Audio Synthesizer ผ่าน Web Audio API โดยไม่ต้องพึ่งพาไฟล์เสียง `.mp3` ภายนอกที่อาจโหลดไม่ติด:
+  - **Stranger Alert (บุคคลแปลกหน้า):** เสียงไซเรนเตือนภัย 2 โทนความถี่สูง (880Hz -> 587Hz)
+  - **Delivery Courier (พนักงานส่งพัสดุ):** เสียงกระดิ่งคอร์ดแจ้งเตือน 2 จังหวะ (523Hz -> 659Hz)
+  - **Household Member (คนในบ้าน):** เสียงกระดิ่งต้อนรับ (659Hz -> 880Hz)
+- มีปุ่มสลับเปิด/ปิดเสียงเตือน (`Volume2` / `VolumeX`) บนแถบ Camera Controls เพื่อความสะดวกในการใช้งาน
+- ส่ง Event `vigil-alerts-updated` ไปยัง Navbar ทันทีเพื่ออัปเดต Badge ตัวเลขสีแดงบนไอคอนกระดิ่งแบบเรียลไทม์
+

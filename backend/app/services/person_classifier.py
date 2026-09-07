@@ -1,0 +1,224 @@
+import os
+import json
+import time
+import uuid
+import logging
+from datetime import datetime, timezone
+from typing import List, Dict, Any, Optional
+import numpy as np
+from PIL import Image
+
+from sqlalchemy.orm import Session
+from app.models.person import Person
+from app.models.detection import DetectionHistory
+from app.models.alert import Alert
+from app.services.face_embedding_service import match_face_embedding
+
+logger = logging.getLogger("person_classifier")
+
+SNAPSHOT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "snapshots")
+os.makedirs(SNAPSHOT_DIR, exist_ok=True)
+
+
+def analyze_colors_and_features(crop_np: np.ndarray) -> Dict[str, float]:
+    """
+    Analyze color dominant components in the cropped person/clothing area.
+    Can identify courier uniforms (e.g. Flash Yellow, Kerry Orange, Grab Green).
+    """
+    if crop_np is None or crop_np.size == 0:
+        return {}
+    r = np.mean(crop_np[:, :, 0])
+    g = np.mean(crop_np[:, :, 1])
+    b = np.mean(crop_np[:, :, 2])
+    return {"r": float(r), "g": float(g), "b": float(b)}
+
+
+def classify_and_record(
+    db: Session,
+    image_np: np.ndarray,
+    detections: List[Dict[str, Any]],
+    camera_id: str = "cam-1",
+    location: str = "หน้าบ้าน (Main Entrance)",
+    force_category: Optional[str] = None,
+    force_name: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Classifies each detected person into one of three categories:
+    - 'household' (คนในบ้าน)
+    - 'delivery' (คนส่งของ)
+    - 'stranger' (คนแปลกหน้า)
+
+    Saves detection history and triggers alerts if appropriate.
+    """
+    results = []
+    registered_persons = db.query(Person).filter(Person.is_active == True).all()
+
+    # Create mapping by category
+    household_members = [p for p in registered_persons if p.category == "household"]
+    delivery_members = [p for p in registered_persons if p.category == "delivery"]
+
+    h, w = image_np.shape[:2]
+    now = datetime.now(timezone.utc)
+
+    # Save full snapshot image
+    snapshot_filename = f"snap_{int(time.time())}_{uuid.uuid4().hex[:6]}.jpg"
+    snapshot_full_path = os.path.join(SNAPSHOT_DIR, snapshot_filename)
+    try:
+        Image.fromarray(image_np).save(snapshot_full_path, format="JPEG", quality=85)
+        snapshot_url = f"/data/snapshots/{snapshot_filename}"
+    except Exception as e:
+        logger.error(f"Failed to save snapshot: {e}")
+        snapshot_url = ""
+
+    for idx, det in enumerate(detections):
+        box = det["box"]  # [x1, y1, x2, y2]
+        confidence = det.get("confidence", 85.0)
+
+        # Ensure box is within bounds
+        x1 = max(0, min(w - 1, box[0]))
+        y1 = max(0, min(h - 1, box[1]))
+        x2 = max(x1 + 1, min(w, box[2]))
+        y2 = max(y1 + 1, min(h, box[3]))
+        crop = image_np[y1:y2, x1:x2]
+
+        matched_person: Optional[Person] = None
+        category = "stranger"
+        person_name = "บุคคลแปลกหน้า (Stranger)"
+        role = "Stranger"
+
+        # If manually forced for testing / explicit mode
+        if force_category:
+            category = force_category
+            if force_category == "household" and household_members:
+                matched_person = household_members[0]
+                person_name = force_name or matched_person.name
+                role = matched_person.role
+            elif force_category == "delivery" and delivery_members:
+                matched_person = delivery_members[0]
+                person_name = force_name or matched_person.name
+                role = matched_person.role
+            else:
+                person_name = force_name or "บุคคลแปลกหน้า (Stranger)"
+        else:
+            # 1. เปรียบเทียบ Deep Learning Face Embedding กับฐานข้อมูลบุคคลที่เทรนไว้
+            face_match, match_score = match_face_embedding(crop, threshold=0.58, is_full_person_crop=True)
+            if face_match:
+                matched_pid = face_match.get("person_id")
+                if matched_pid:
+                    matched_person = next((p for p in registered_persons if p.id == matched_pid), None)
+                category = face_match.get("category", "household")
+                person_name = face_match.get("name", "สมาชิกในบ้าน")
+                role = face_match.get("role", "Family" if category == "household" else "Delivery")
+                confidence = round(max(confidence, match_score * 100), 1)
+            else:
+                # 2. ตรวจสอบ Heuristic เครื่องแบบขนส่งพัสดุ (Flash Yellow, Kerry Orange, Grab Green)
+                color_feats = analyze_colors_and_features(crop)
+                r = color_feats.get("r", 128)
+                g = color_feats.get("g", 128)
+                b = color_feats.get("b", 128)
+
+                is_flash_yellow = (r > 160 and g > 150 and b < 100)
+                is_kerry_orange = (r > 180 and g > 80 and b < 80)
+                is_grab_green = (g > 140 and r < 110 and b < 110)
+
+                if (is_flash_yellow or is_kerry_orange or is_grab_green) and delivery_members:
+                    category = "delivery"
+                    if is_flash_yellow:
+                        matched_person = next((p for p in delivery_members if "Flash" in p.name or "Flash" in p.department), delivery_members[0])
+                    elif is_kerry_orange:
+                        matched_person = next((p for p in delivery_members if "Kerry" in p.name or "Kerry" in p.department), delivery_members[0])
+                    else:
+                        matched_person = next((p for p in delivery_members if "Grab" in p.name or "Grab" in p.department), delivery_members[0])
+                    person_name = matched_person.name
+                    role = matched_person.role
+                else:
+                    # บุคคลที่ยังไม่มีในฐานข้อมูล (Stranger)
+                    category = "stranger"
+                    person_name = f"บุคคลแปลกหน้า #{idx + 1}"
+                    role = "Stranger"
+
+        # Determine Alert triggering rules
+        alert_created = False
+        alert_msg = None
+
+        # 1. บันทึก History ลง SQLite
+        detection_record = DetectionHistory(
+            person_id=matched_person.id if matched_person else None,
+            person_name=person_name,
+            category=category,
+            confidence=confidence,
+            bounding_box=json.dumps([x1, y1, x2, y2]),
+            snapshot_path=snapshot_url or (matched_person.photo_url if matched_person else ""),
+            camera_id=camera_id,
+            location=location,
+            alert_triggered=False,
+            timestamp=now,
+        )
+        db.add(detection_record)
+        db.flush()
+
+        # 2. ตรวจสอบการสร้างการแจ้งเตือน (Alerts) ส่งไปยังหน้าแจ้งเตือน
+        if category == "stranger":
+            alert_created = True
+            alert_msg = f"ตรวจพบคนแปลกหน้า! บริเวณ {location}"
+            alert = Alert(
+                title=f"ตรวจพบคนแปลกหน้าบริเวณ {location}!",
+                description=f"ระบบตรวจพบบุคคลแปลกหน้า (ความมั่นใจ {confidence}%) ไม่ตรงกับฐานข้อมูลใบหน้าที่เทรนไว้ บริเวณ {location}",
+                category="stranger",
+                severity="warning",
+                location=location,
+                detection_id=detection_record.id,
+                thumbnail=snapshot_url or (matched_person.photo_url if matched_person else ""),
+                is_read=False,
+                created_at=now,
+            )
+            db.add(alert)
+            detection_record.alert_triggered = True
+
+        elif category == "delivery":
+            alert_created = True
+            alert_msg = f"มีพัสดุมาส่ง: {person_name} บริเวณ {location}"
+            alert = Alert(
+                title=f"ตรวจพบคนส่งของ: {person_name}",
+                description=f"AI ตรวจพบเจ้าหน้าที่ขนส่งพัสดุ/ไรเดอร์ ({person_name}) มาถึงบริเวณ {location} (ความมั่นใจ {confidence}%)",
+                category="delivery",
+                severity="info",
+                location=location,
+                detection_id=detection_record.id,
+                thumbnail=snapshot_url or (matched_person.photo_url if matched_person else ""),
+                is_read=False,
+                created_at=now,
+            )
+            db.add(alert)
+            detection_record.alert_triggered = True
+
+        elif category == "household":
+            alert_created = True
+            alert_msg = f"ตรวจพบสมาชิกในบ้าน: {person_name} ถึงบริเวณ {location}"
+            alert = Alert(
+                title=f"ตรวจพบสมาชิกในบ้าน: {person_name}",
+                description=f"AI ตรวจพบและจดจำใบหน้าของ {person_name} ({role}) เข้าสู่บริเวณ {location} อย่างปลอดภัย (ความแม่นยำ {confidence}%)",
+                category="household",
+                severity="info",
+                location=location,
+                detection_id=detection_record.id,
+                thumbnail=snapshot_url or (matched_person.photo_url if matched_person else ""),
+                is_read=False,
+                created_at=now,
+            )
+            db.add(alert)
+            detection_record.alert_triggered = True
+
+        results.append({
+            "person_name": person_name,
+            "category": category,
+            "confidence": confidence,
+            "bounding_box": [x1, y1, x2, y2],
+            "alert_created": alert_created,
+            "alert_message": alert_msg,
+            "role": role,
+            "location": location,
+        })
+
+    db.commit()
+    return results
