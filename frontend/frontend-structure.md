@@ -52,7 +52,7 @@ frontend/
 │   │   │   └── components/
 │   │   │       ├── CameraFeed.jsx       # ฟีดกล้อง + กรอบ Face Bounding Box + ข้อมูล FPS
 │   │   │       ├── StatsOverview.jsx    # แถบสถิติ 4 ช่อง
-│   │   │       └── RecentVisitors.jsx   # ลิสต์ผู้มาติดต่อล่าสุด
+│   │   │       └── RecentVisitors.jsx   # ลิสต์ผู้มาติดต่อล่าสุด พร้อมปุ่มลบเดี่ยวและล้างประวัติ
 │   │   │
 │   │   ├── training/           # [3] หน้าฐานข้อมูลบุคคล & สถานะเทรน AI
 │   │   │   ├── TrainingPage.jsx
@@ -62,20 +62,23 @@ frontend/
 │   │   │       ├── ModelStats.jsx       # ข้อมูลสถิติโมเดล YOLO (Epochs, mAP, Dataset Size)
 │   │   │       └── GpuConsole.jsx       # หน้าต่างจำลองคอนโซล GPU Log + ปุ่ม Stop/Resume
 │   │   │
-│   │   ├── add-person/         # [4] หน้าลงทะเบียนบุคคลใหม่ & อัปโหลด Dataset
+│   │   ├── history/            # [4] หน้าประวัติการตรวจจับฉบับสมบูรณ์ (Detection History & Logs)
+│   │   │   └── HistoryPage.jsx          # ค้นหา กรองหมวดหมู่ มัลติซีเล็กลบชุด และล้างประวัติทั้งหมด
+│   │   │
+│   │   ├── add-person/         # [5] หน้าลงทะเบียนบุคคลใหม่ & อัปโหลด Dataset
 │   │   │   ├── AddPersonPage.jsx
 │   │   │   └── components/
 │   │   │       ├── IdentityForm.jsx     # ฟอร์มชื่อ-นามสกุล, เลือก Role/Category
 │   │   │       ├── DatasetUploader.jsx  # Dropzone อัปโหลดภาพ (Drag & Drop)
 │   │   │       └── WebcamCapture.jsx    # จำลองหรือเปิดกล้องเว็บแคมถ่ายภาพสด
 │   │   │
-│   │   ├── alerts/             # [5] หน้าระบบแจ้งเตือนความปลอดภัย
+│   │   ├── alerts/             # [6] หน้าระบบแจ้งเตือนความปลอดภัย
 │   │   │   ├── AlertsPage.jsx
 │   │   │   └── components/
 │   │   │       ├── AlertItem.jsx        # แถวการแจ้งเตือน (CRITICAL, HIGH, NORMAL)
 │   │   │       └── AlertFilters.jsx     # สลับดู Unread / All และปุ่ม Mark all read
 │   │   │
-│   │   └── auth/               # [6, 7] หน้าเข้าสู่ระบบและสมัครสมาชิก
+│   │   └── auth/               # [7, 8] หน้าเข้าสู่ระบบและสมัครสมาชิก
 │   │       ├── LoginPage.jsx
 │   │       └── SignupPage.jsx
 │   │
@@ -139,7 +142,18 @@ frontend/
     - กล่องคอนโซลสไตล์ Dark CLI แสดงข้อความจำลองการ Train (Loss, Epoch Progress, Learning Rate)
     - ปุ่มควบคุมการเทรน: `Pause Training`, `Resume`, `Retrain Model`
 
-### 3.4 หน้าลงทะเบียนบุคคลใหม่ (`/add-person`)
+### 3.4 หน้าประวัติการตรวจจับฉบับสมบูรณ์ (`/history`)
+- **วัตถุประสงค์:** จัดการและตรวจสอบประวัติการตรวจจับบุคคลทั้งหมดจากกล้องวงจรปิด
+- **องค์ประกอบหลัก:**
+  - **Overview Metric Cards:** ยอดบันทึกวันนี้, คนในบ้าน, คนส่งของ, คนแปลกหน้า
+  - **Category Filter Pills:** ทั้งหมด, คนในบ้าน, คนส่งของ, คนแปลกหน้า
+  - **Search Bar:** ค้นหาชื่อบุคคล, รหัสกล้อง, หรือสถานที่ตรวจพบ
+  - **Bulk Actions:** ติ๊กเลือกหลายรายการพร้อมกัน และกดปุ่มลบชุด (Bulk Delete)
+  - **Clear All History:** ปุ่มล้างประวัติการตรวจจับทั้งหมดพร้อม Modal ยืนยัน
+  - **Snapshot Preview Modal:** ดูภาพถ่ายใบหน้าขนาดใหญ่ พร้อมค่า Confidence และเวลา
+  - **Identify & Train Person:** ระบุตัวตนคนแปลกหน้าและส่งภาพเข้าชุดข้อมูลเทรนโมเดล AI
+
+### 3.5 หน้าลงทะเบียนบุคคลใหม่ (`/add-person`)
 - **วัตถุประสงค์:** เพิ่มบุคคลใหม่เข้าสู่ฐานข้อมูล Face Recognition
 - **องค์ประกอบหลัก:**
   - **Identity Details Form:**
@@ -152,20 +166,21 @@ frontend/
     - **Dataset Counter Badge:** แถบแสดงจำนวนภาพที่เลือก (มีคำแนะนำให้ใส่รูปอย่างน้อย 15 ภาพเพื่อความแม่นยำ)
   - **Action Buttons:** ปุ่ม `Cancel` (ย้อนกลับ) และ `Save & Train` (บันทึกข้อมูลและส่งเข้าคิวเทรน)
 
-### 3.5 หน้าระบบแจ้งเตือนความปลอดภัย (`/alerts`)
-- **วัตถุประสงค์:** รวมประวัติเหตุการณ์ความปลอดภัยและภัยคุกคาม
+### 3.6 หน้าระบบแจ้งเตือนความปลอดภัย (`/alerts`)
+- **วัตถุประสงค์:** รวมประวัติเหตุการณ์ความปลอดภัยและภัยคุกคาม พร้อมฟังก์ชันลบและจัดการ
 - **องค์ประกอบหลัก:**
   - **Filter Controls:**
     - ปุ่มสลับแท็บ `All Alerts` กับ `Unread Only`
     - ปุ่ม `Mark All as Read` สำหรับเคลียร์สถานะอ่านทั้งหมด
+    - ปุ่ม `Clear Alerts` (ล้างการแจ้งเตือน): เลือกลบเฉพาะที่อ่านแล้ว หรือลบทั้งหมดในหมวดหมู่นี้
   - **Alert Items List:**
-    - รายการแจ้งเตือนแบ่งตาม Severity Level:
-      - `CRITICAL` (สีแดงเข้ม): พบบุคคลใน Blacklist
-      - `HIGH` (สีส้ม/แดง): พบบุคคลแปลกหน้าในยามวิกาล
-      - `NORMAL` (สีฟ้า/เขียว): ตรวจพบบุคคลทั่วไป/พนักงาน
-    - แสดงเวลา, ภาพ Snapshot จากกล้อง, รายละเอียดเหตุการณ์, และปุ่มคลิกเพื่อสลับสถานะอ่านแล้ว
+    - รายการแจ้งเตือนแบ่งตามหมวดหมู่: `stranger`, `delivery`, `household`
+    - แสดงเวลา, ภาพ Snapshot จากกล้อง, รายละเอียดเหตุการณ์
+    - ปุ่มคลิกสลับสถานะอ่านแล้ว
+    - **ปุ่มไอคอนถังขยะ (Delete):** สำหรับลบการแจ้งเตือนเฉพาะรายการ พร้อมหน้าต่างยืนยัน
+    - **ปุ่มระบุตัวตน / เทรน:** สำหรับคนแปลกหน้า เพื่อนำภาพไปบันทึกตัวตนทันที
 
-### 3.6 หน้าเข้าสู่ระบบ (`/login`) & สมัครสมาชิก (`/signup`)
+### 3.7 หน้าเข้าสู่ระบบ (`/login`) & สมัครสมาชิก (`/signup`)
 - **วัตถุประสงค์:** ยืนยันตัวตนเจ้าหน้าที่ดูแลระบบ (Authentication)
 - **องค์ประกอบหลัก:**
   - ดีไซน์ Modern Glass Card กึ่งกลางหน้าจอ โทนสีอบอุ่นเข้ากับธีม Vigil
@@ -222,6 +237,7 @@ import AuthLayout from "../components/layout/AuthLayout";
 import LandingPage from "../pages/landing/LandingPage";
 import DetectionPage from "../pages/detection/DetectionPage";
 import TrainingPage from "../pages/training/TrainingPage";
+import HistoryPage from "../pages/history/HistoryPage";
 import AddPersonPage from "../pages/add-person/AddPersonPage";
 import AlertsPage from "../pages/alerts/AlertsPage";
 import LoginPage from "../pages/auth/LoginPage";
@@ -234,6 +250,7 @@ const router = createBrowserRouter([
       { path: "/", element: <LandingPage /> },
       { path: "/detection", element: <DetectionPage /> },
       { path: "/training", element: <TrainingPage /> },
+      { path: "/history", element: <HistoryPage /> },
       { path: "/add-person", element: <AddPersonPage /> },
       { path: "/alerts", element: <AlertsPage /> },
     ],

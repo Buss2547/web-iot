@@ -117,14 +117,43 @@ def get_detection_history(
     return records
 
 
+@router.delete("/history", summary="ลบประวัติการตรวจจับทั้งหมด หรือตามหมวดหมู่")
+def clear_detection_history(
+    category: Optional[str] = Query(None, description="กรองตามประเภท: 'household', 'delivery', 'stranger'"),
+    db: Session = Depends(get_db),
+):
+    """
+    ล้างข้อมูลประวัติการตรวจจับทั้งหมด หรือกรองตามหมวดหมู่
+    """
+    query = db.query(DetectionHistory)
+    if category and category.strip() and category.upper() != "ALL":
+        query = query.filter(DetectionHistory.category == category.lower())
+
+    records = query.all()
+    deleted_count = len(records)
+    for r in records:
+        # Nullify foreign key in alerts first to prevent FK constraint failure
+        db.query(Alert).filter(Alert.detection_id == r.id).update({"detection_id": None})
+        db.delete(r)
+    db.commit()
+    return {
+        "message": f"ลบประวัติการตรวจจับสำเร็จ {deleted_count} รายการ",
+        "deleted_count": deleted_count,
+    }
+
+
 @router.delete("/history/{history_id}", status_code=status.HTTP_204_NO_CONTENT, summary="ลบประวัติการตรวจจับ")
 def delete_detection_history(history_id: int, db: Session = Depends(get_db)):
     record = db.query(DetectionHistory).filter(DetectionHistory.id == history_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Detection record not found")
+    
+    # Nullify foreign key in alerts
+    db.query(Alert).filter(Alert.detection_id == history_id).update({"detection_id": None})
     db.delete(record)
     db.commit()
     return None
+
 
 
 @router.put("/history/{history_id}/identify", response_model=IdentifyPersonResponse, summary="ระบุตัวตนและเทรนข้อมูลบุคคลจากประวัติการตรวจจับ")

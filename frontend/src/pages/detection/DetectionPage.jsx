@@ -26,6 +26,7 @@ import {
   Zap,
   Volume2,
   VolumeX,
+  Trash2,
 } from "lucide-react";
 import MetricCard from "../../components/common/MetricCard";
 import Badge from "../../components/common/Badge";
@@ -100,6 +101,14 @@ export default function DetectionPage() {
   const [isSubmittingIdentify, setIsSubmittingIdentify] = useState(false);
   const [identifySuccessMessage, setIdentifySuccessMessage] = useState("");
 
+  // History Deletion States
+  const [recordToDelete, setRecordToDelete] = useState(null);
+  const [isDeleteRecordModalOpen, setIsDeleteRecordModalOpen] = useState(false);
+  const [isDeletingRecord, setIsDeletingRecord] = useState(false);
+
+  const [isClearHistoryModalOpen, setIsClearHistoryModalOpen] = useState(false);
+  const [isClearingHistory, setIsClearingHistory] = useState(false);
+
   // Real-time Stats from Database
   const [stats, setStats] = useState({
     total_today: 4,
@@ -171,9 +180,10 @@ export default function DetectionPage() {
 
     try {
       const h = await detectionApi.getHistory(historyCategory);
-      if (h && Array.isArray(h) && h.length > 0) {
+      if (h && Array.isArray(h)) {
         const formatted = h.map((item) => ({
           id: `hist-${item.id}`,
+          rawId: item.id,
           name: item.person_name,
           role: item.category,
           confidence: item.confidence,
@@ -194,6 +204,41 @@ export default function DetectionPage() {
       }
     } catch (err) {
       console.warn("Backend history unavailable, using initial visitors:", err);
+    }
+  };
+
+  const handleDeleteHistoryRecord = async () => {
+    if (!recordToDelete) return;
+    setIsDeletingRecord(true);
+    try {
+      const targetId = recordToDelete.rawId || (typeof recordToDelete.id === "string" ? recordToDelete.id.replace("hist-", "") : recordToDelete.id);
+      setVisitors((prev) => prev.filter((v) => v.id !== recordToDelete.id));
+      await detectionApi.deleteHistory(targetId);
+      setIsDeleteRecordModalOpen(false);
+      setRecordToDelete(null);
+      await fetchStatsAndHistory();
+    } catch (err) {
+      console.error("Failed to delete detection record:", err);
+      alert("เกิดข้อผิดพลาดในการลบประวัติ: " + (err.response?.data?.detail || err.message));
+      await fetchStatsAndHistory();
+    } finally {
+      setIsDeletingRecord(false);
+    }
+  };
+
+  const handleClearHistory = async () => {
+    setIsClearingHistory(true);
+    try {
+      setVisitors([]);
+      await detectionApi.clearHistory(historyCategory !== "ALL" ? historyCategory : undefined);
+      setIsClearHistoryModalOpen(false);
+      await fetchStatsAndHistory();
+    } catch (err) {
+      console.error("Failed to clear detection history:", err);
+      alert("เกิดข้อผิดพลาดในการล้างประวัติ: " + (err.response?.data?.detail || err.message));
+      await fetchStatsAndHistory();
+    } finally {
+      setIsClearingHistory(false);
     }
   };
 
@@ -1042,9 +1087,21 @@ export default function DetectionPage() {
                 </h2>
                 <p className="text-xs text-[#6b6b6b]">ประวัติจำแนกบุคคลจากฐานข้อมูล SQLite</p>
               </div>
-              <span className="text-xs font-bold bg-[#f7f1e9] text-[#1a1a1a] px-2 py-1 rounded-lg border border-[#e8e0d5]">
-                {visitors.length} Logs
-              </span>
+              <div className="flex items-center gap-2">
+                {visitors.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsClearHistoryModalOpen(true)}
+                    className="p-1.5 rounded-xl text-[#9e9e9e] hover:text-[#c62828] hover:bg-[#ffebee] border border-transparent hover:border-[#ef9a9a] transition-all cursor-pointer"
+                    title="ล้างประวัติทั้งหมด"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+                <span className="text-xs font-bold bg-[#f7f1e9] text-[#1a1a1a] px-2.5 py-1 rounded-lg border border-[#e8e0d5]">
+                  {visitors.length} Logs
+                </span>
+              </div>
             </div>
 
             {/* Category Filter Pills */}
@@ -1101,19 +1158,33 @@ export default function DetectionPage() {
                         {visitor.confidence}%
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenIdentifyModal(visitor)}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-bold cursor-pointer transition-all shadow-2xs border ${
-                        visitor.role === "stranger"
-                          ? "bg-[#fff3e0] hover:bg-[#ffe0b2] text-[#e65100] border-[#ffb74d] animate-pulse"
-                          : "bg-white hover:bg-[#f5c9a8]/30 text-[#1a1a1a] border-[#e8e0d5]"
-                      }`}
-                      title="ระบุตัวตนและบันทึกภาพนี้เข้าสู่ระบบโมเดล AI"
-                    >
-                      <Sparkles className="w-3 h-3 text-[#e65100]" />
-                      <span>{visitor.role === "stranger" ? "ระบุตัวตน & เทรน" : "เทรนข้อมูลเพิ่ม"}</span>
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenIdentifyModal(visitor)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-bold cursor-pointer transition-all shadow-2xs border ${
+                          visitor.role === "stranger"
+                            ? "bg-[#fff3e0] hover:bg-[#ffe0b2] text-[#e65100] border-[#ffb74d] animate-pulse"
+                            : "bg-white hover:bg-[#f5c9a8]/30 text-[#1a1a1a] border-[#e8e0d5]"
+                        }`}
+                        title="ระบุตัวตนและบันทึกภาพนี้เข้าสู่ระบบโมเดล AI"
+                      >
+                        <Sparkles className="w-3 h-3 text-[#e65100]" />
+                        <span>{visitor.role === "stranger" ? "ระบุตัวตน & เทรน" : "เทรนข้อมูลเพิ่ม"}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRecordToDelete(visitor);
+                          setIsDeleteRecordModalOpen(true);
+                        }}
+                        className="p-1.5 rounded-xl text-[#9e9e9e] hover:text-[#c62828] hover:bg-[#ffebee] border border-transparent hover:border-[#ef9a9a] transition-all cursor-pointer"
+                        title="ลบรายการนี้"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1428,6 +1499,122 @@ export default function DetectionPage() {
               </Button>
             </div>
           </form>
+        </div>
+      </Modal>
+      {/* DELETE SINGLE RECORD MODAL */}
+      <Modal
+        isOpen={isDeleteRecordModalOpen}
+        onClose={() => {
+          if (!isDeletingRecord) {
+            setIsDeleteRecordModalOpen(false);
+            setRecordToDelete(null);
+          }
+        }}
+        title="ยืนยันการลบประวัติการตรวจจับ"
+        maxWidth="max-w-md"
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex items-start gap-3.5 p-3 rounded-2xl bg-[#ffebee] border border-[#ef9a9a]">
+            <AlertTriangle className="w-6 h-6 text-[#c62828] shrink-0 mt-0.5" />
+            <div className="flex flex-col text-xs">
+              <span className="font-bold text-[#b71c1c]">ต้องการลบรายการประวัตินี้ใช่หรือไม่?</span>
+              <span className="text-[#6b6b6b] mt-0.5">
+                รายการจะถูกลบออกจากฐานข้อมูล SQLite อย่างถาวร
+              </span>
+            </div>
+          </div>
+
+          {recordToDelete && (
+            <div className="p-3 rounded-2xl bg-[#f7f1e9] border border-[#e8e0d5] text-xs flex items-center gap-3">
+              <img
+                src={recordToDelete.photoUrl}
+                alt={recordToDelete.name}
+                className="w-12 h-12 rounded-xl object-cover border border-[#e8e0d5] shrink-0"
+              />
+              <div className="flex flex-col gap-0.5">
+                <span className="font-bold text-[#1a1a1a]">{recordToDelete.name}</span>
+                <span className="text-[11px] text-[#6b6b6b]">
+                  {recordToDelete.role} • ความแม่นยำ {recordToDelete.confidence}%
+                </span>
+                <span className="text-[10px] text-[#8e8e8e]">
+                  {recordToDelete.time} • {recordToDelete.location}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#e8e0d5]">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setIsDeleteRecordModalOpen(false);
+                setRecordToDelete(null);
+              }}
+              disabled={isDeletingRecord}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={handleDeleteHistoryRecord}
+              disabled={isDeletingRecord}
+              icon={Trash2}
+              className="bg-[#c62828] hover:bg-[#b71c1c] text-white border-none shadow-xs"
+            >
+              {isDeletingRecord ? "กำลังลบ..." : "ยืนยันการลบ"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* CLEAR ALL HISTORY MODAL */}
+      <Modal
+        isOpen={isClearHistoryModalOpen}
+        onClose={() => {
+          if (!isClearingHistory) setIsClearHistoryModalOpen(false);
+        }}
+        title="ล้างประวัติการตรวจจับ (Clear Detection History)"
+        maxWidth="max-w-md"
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex items-start gap-3.5 p-3 rounded-2xl bg-[#ffebee] border border-[#ef9a9a]">
+            <AlertTriangle className="w-6 h-6 text-[#c62828] shrink-0 mt-0.5" />
+            <div className="flex flex-col text-xs">
+              <span className="font-bold text-[#b71c1c]">ต้องการล้างประวัติทั้งหมดใช่หรือไม่?</span>
+              <span className="text-[#6b6b6b] mt-0.5">
+                {historyCategory === "ALL"
+                  ? `ระบบจะลบประวัติการตรวจจับทั้งหมด (${visitors.length} รายการ) ออกจากฐานข้อมูล SQLite`
+                  : `ระบบจะลบประวัติเฉพาะหมวดหมู่ '${historyCategory}' (${visitors.length} รายการ)`}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#e8e0d5]">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsClearHistoryModalOpen(false)}
+              disabled={isClearingHistory}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={handleClearHistory}
+              disabled={isClearingHistory}
+              icon={Trash2}
+              className="bg-[#c62828] hover:bg-[#b71c1c] text-white border-none shadow-xs"
+            >
+              {isClearingHistory ? "กำลังล้างข้อมูล..." : "ยืนยันการล้างประวัติ"}
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>

@@ -369,3 +369,27 @@ backend/data/
 3. **การส่งต่อข้อมูลประวัติ (Real-time Event Dispatch):**
    - บันทึกทุก Detection Event ลงในตาราง `detection_history` อย่างต่อเนื่อง ทำให้หน้าเว็บสามารถดึงประวัติและแสดงการแจ้งเตือนได้อย่างต่อเนื่องทุกรอบการตรวจจับ
 
+---
+
+### 7.6 API Endpoints สำหรับจัดการการแจ้งเตือน (Alerts) และประวัติการตรวจจับ (Detection History)
+
+#### ระบบการแจ้งเตือน (Security Alerts)
+| Method | Endpoint | คำอธิบาย |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/alerts` | ดึงรายการแจ้งเตือนทั้งหมด (รองรับกรอง `category`, `unread_only`) |
+| `GET` | `/api/v1/alerts/unread-count` | ดึงจำนวนแจ้งเตือนที่ยังไม่ได้อ่าน |
+| `PUT` | `/api/v1/alerts/read-all` | ทำเครื่องหมายว่าอ่านแล้วทั้งหมด |
+| `PUT` | `/api/v1/alerts/{id}/read` | สลับสถานะอ่านแล้ว/ยังไม่อ่านของรายการเดี่ยว |
+| `DELETE` | `/api/v1/alerts/{id}` | ลบการแจ้งเตือนเฉพาะรายการ |
+| `DELETE` | `/api/v1/alerts` | ล้างการแจ้งเตือนทั้งหมด หรือกรองลบเฉพาะที่อ่านแล้ว (`read_only=true`) |
+
+#### ระบบประวัติการตรวจจับ (Detection History)
+| Method | Endpoint | คำอธิบาย |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/detection/stats` | สรุปสถิติการตรวจจับประจำวันแยกตาม 3 กลุ่มบุคคล |
+| `GET` | `/api/v1/detection/history` | ดึงประวัติการตรวจจับทั้งหมด (รองรับกรอง `category`, `limit`, `offset`) |
+| `DELETE` | `/api/v1/detection/history/{id}` | ลบประวัติการตรวจจับเฉพาะรายการ (พร้อมตัด Foreign Key ใน `alerts` อัตโนมัติ) |
+| `DELETE` | `/api/v1/detection/history` | ล้างประวัติการตรวจจับทั้งหมด หรือกรองตามหมวดหมู่ (`category`) |
+| `PUT` | `/api/v1/detection/history/{id}/identify` | นำประวัติคนแปลกหน้าไประบุตัวตนและเทรนเข้าสู่โมเดล AI |
+
+

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router";
-import { Shield, Camera, Database, Bell, UserPlus, LogIn, LogOut, User } from "lucide-react";
+import { Shield, Camera, Clock, Database, Bell, UserPlus, LogIn, LogOut, User } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { alertsApi } from "../../services/api";
 
@@ -32,6 +32,7 @@ export default function Navbar() {
   const navLinks = [
     { name: "Live Detection", path: "/detection", icon: Camera },
     { name: "Training & DB", path: "/training", icon: Database },
+    { name: "History", path: "/history", icon: Clock },
     {
       name: "Alerts",
       path: "/alerts",
