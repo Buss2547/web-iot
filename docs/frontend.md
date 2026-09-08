@@ -24,10 +24,10 @@ frontend/
 ├── src/
 │   ├── assets/                 # รูปภาพ โลโก้ และภาพประกอบ
 │   ├── components/             # Reusable UI Components
-│   │   ├── common/             # UI พื้นฐาน (Button, Badge, Input, MetricCard, Modal)
+│   │   ├── common/             # UI พื้นฐาน (Button, Badge, Input, MetricCard, Modal, GlobalAlertToast)
 │   │   ├── guards/             # Route Guards (ProtectedRoute, GuestRoute)
 │   │   └── layout/             # MainLayout, AuthLayout, Navbar, Footer
-│   ├── context/                # AuthContext (จัดการ Token, สถานะการล็อกอิน, บทบาทผู้ใช้)
+│   ├── context/                # AuthContext, DetectionContext (ระบบกล้อง & AI ตรวจจับ 24/7 ข้ามหน้า)
 │   ├── pages/                  # หน้าเพจหลักทั้ง 7 หน้า
 │   │   ├── landing/            # [1] LandingPage.jsx (หน้าแรก)
 │   │   ├── detection/          # [2] DetectionPage.jsx (ตรวจจับสด + กรอบ Bounding Box)
@@ -114,6 +114,25 @@ frontend/
 window.dispatchEvent(new CustomEvent('vigil-alerts-updated'));
 ```
 Navbar จะดักฟัง Event นี้เพื่ออัปเดตตัวเลขแจ้งเตือนที่ยังไม่ได้อ่านบนไอคอนกระดิ่งทันที
+
+### 4.5 การตรวจจับกล้องเบื้องหลังตลอดเวลา 24/7 ข้ามทุกหน้า (`DetectionContext` & `MainLayout`)
+เดิมทีระบบจะรันการตรวจจับเฉพาะขณะที่ผู้ใช้อยู่ในหน้า `/detection` เท่านั้น เมื่อเปลี่ยนไปยังหน้าอื่น (`/training`, `/history`, `/alerts`, `/add-person`) Component จะถูก Unmount ทำให้การตรวจจับหยุดลง
+
+**สถาปัตยกรรมใหม่ (Persistent Background AI Detection & Dual-Trigger Alerts):**
+1. **ย้าย Loop การตรวจจับสู่ Context ระดับ Layout:** นำวงจรตรวจจับและข้อมูลกล้องทั้งหมดไปไว้ใน `DetectionContext` (`DetectionProvider`) ซึ่งห่อหุ้ม `MainLayout` ทำให้ State และ Interval ไม่ถูกทำลายเมื่อสลับหน้า
+2. **Persistent Hidden Stream Element (`vigil-persistent-stream-img`):**
+   - `DetectionProvider` ฝังแท็ก `<img id="vigil-persistent-stream-img" ... />` ซ่อนไว้ใน DOM ตลอดเวลา
+   - เมื่อสลับไปหน้าอื่น (`/training`, `/history`, `/alerts`, `/add-person`) ระบบยังคงดึงเฟรมสดผ่าน HTML5 Canvas จากแท็กซ่อนนี้ แล้วส่งไปประมวลผลที่ `POST /api/v1/detection/detect-image` ได้ทันทีแบบเรียลไทม์ โดยไม่ต้องพึ่งพา Proxy เครือข่าย
+   - หากเกิดข้อผิดพลาดในการดึงเฟรม Canvas ระบบจะสลับอัตโนมัติ (Fallback) ไปเรียก `POST /api/v1/detection/detect-esp32` ผ่าน FastAPI Backend
+3. **ระบบแจ้งเตือน 2 ช่องทาง (Dual-Trigger Alerting Mechanism):**
+   - **Direct Detection Trigger:** เมื่อ Loop การตรวจจับพบคนแปลกหน้า (`stranger`) หรือคนส่งของ (`delivery`) จะสั่งเล่นเสียงไซเรน/กระดิ่งทันทีและตั้งค่า `alertNotification`
+   - **Database Sync Trigger (`syncUnreadAlerts`):** ทุกๆ 4 วินาที Context จะตรวจสอบ SQLite (`GET /api/v1/alerts?unread_only=true&limit=1`) เพื่อให้มั่นใจว่าหากมี Alert ใหม่เกิดขึ้น (ไม่ว่าจะตรวจจับจากหน้านี้ Backend หรืออุปกรณ์อื่น) จะส่งเสียงแจ้งเตือนและแสดง Toast ทันที 100%
+4. **การแสดงผลและการแจ้งเตือนครอบคลุมทุกหน้า:**
+   - **เสียงเตือน (Chime):** สังเคราะห์ผ่าน Web Audio API ดังขึ้นทันทีแม้เปิดหน้าอื่นอยู่ พร้อมระบบ `AudioContext.resume()` รองรับ Autoplay Policy ของเบราว์เซอร์
+   - **การแจ้งเตือนลอย (GlobalAlertToast):** เมื่อตรวจพบขณะอยู่หน้าอื่น จะมีแบนเนอร์ลอยขึ้นมาที่มุมขวาบนพร้อมปุ่มลิงก์ด่วนไปยัง `/alerts` หรือ `/detection`
+   - **HTML5 Web Desktop Notifications:** เด้งการแจ้งเตือนระดับ OS เมื่อเปิดการยินยอม
+   - **สถานะกล้องสดบน Navbar:** แสดง Badge `CAM 24/7 ACTIVE` พร้อมจุดสีเขียวกระพริบยืนยันว่ากล้องทำงานตลอดเวลา
+5. **การซิงก์ข้อมูลบนหน้า Live Detection (`DetectionPage`):** หน้านี้จะเรียกใช้ `useDetection()` เพื่อรับ State และ Detections ล่าสุด และใช้ฟังก์ชัน `fetchStatsAndHistory()` ในการรีเฟรชการ์ดประวัติผู้มาเยือนและสถิติให้ตรงกับฐานข้อมูลโดยไม่ต้องสร้าง Timer ตรวจจับซ้ำซ้อน
 
 ---
 

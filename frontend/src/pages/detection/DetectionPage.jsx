@@ -1,9 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Users,
-  CheckCircle2,
   AlertTriangle,
-  ShieldAlert,
   Camera,
   Eye,
   EyeOff,
@@ -12,21 +10,16 @@ import {
   RefreshCw,
   ExternalLink,
   SlidersHorizontal,
-  Check,
   Sparkles,
   Package,
   Bell,
   Home,
-  UserPlus,
-  Play,
-  Pause,
-  UserCheck,
-  User,
-  Tag,
   Zap,
   Volume2,
   VolumeX,
   Trash2,
+  Check,
+  CheckCircle2,
 } from "lucide-react";
 import MetricCard from "../../components/common/MetricCard";
 import Badge from "../../components/common/Badge";
@@ -35,55 +28,44 @@ import Modal from "../../components/common/Modal";
 import { Input, Textarea } from "../../components/common/Input";
 import { initialVisitors } from "../../mocks/mockVisitors";
 import { detectionApi, personsApi } from "../../services/api";
-
-const DEFAULT_IP = "192.168.137.65";
-const DEFAULT_PATH = "/stream";
-const DEFAULT_STREAM_URL = `http://${DEFAULT_IP}${DEFAULT_PATH}`;
-
-// Helper to construct full stream URL
-const buildStreamUrl = (ip, port, path) => {
-  const cleanIp = ip.trim();
-  if (cleanIp.startsWith("http://") || cleanIp.startsWith("https://")) {
-    return cleanIp;
-  }
-  const cleanPort = port && port.trim() ? `:${port.trim()}` : "";
-  const cleanPath = path && path.trim()
-    ? path.trim().startsWith("/")
-      ? path.trim()
-      : `/${path.trim()}`
-    : DEFAULT_PATH;
-  return `http://${cleanIp}${cleanPort}${cleanPath}`;
-};
-
-// Helper to extract IP, port, and path from a URL
-const parseStreamUrl = (url) => {
-  try {
-    const parsed = new URL(url.startsWith("http") ? url : `http://${url}`);
-    return {
-      ip: parsed.hostname || DEFAULT_IP,
-      port: parsed.port || "",
-      path: parsed.pathname || DEFAULT_PATH,
-    };
-  } catch {
-    return { ip: DEFAULT_IP, port: "", path: DEFAULT_PATH };
-  }
-};
+import {
+  useDetection,
+  buildStreamUrl,
+  parseStreamUrl,
+  DEFAULT_IP,
+  DEFAULT_PATH,
+} from "../../context/DetectionContext";
 
 export default function DetectionPage() {
+  const {
+    cameraIp,
+    streamUrl,
+    streamMode,
+    streamStatus,
+    streamKey,
+    setStreamStatus,
+    updateCameraSettings,
+    reconnectStream,
+    isAutoDetect,
+    toggleAutoDetect,
+    isSoundEnabled,
+    toggleSound,
+    isDetecting,
+    runDetection,
+    activeDetections,
+    alertNotification,
+    dismissAlert,
+    stats,
+    fetchStats,
+  } = useDetection();
+
   const [visitors, setVisitors] = useState(initialVisitors);
   const [historyCategory, setHistoryCategory] = useState("ALL");
   const [showBoxes, setShowBoxes] = useState(true);
   const [selectedCamera, setSelectedCamera] = useState("cam-1");
   const [currentTime, setCurrentTime] = useState("");
   const [isCapturing, setIsCapturing] = useState(false);
-  const [isDetecting, setIsDetecting] = useState(false);
-  const [isAutoDetect, setIsAutoDetect] = useState(true);
-  const [autoDetectInterval, setAutoDetectInterval] = useState(3000);
   const [snapshotSuccess, setSnapshotSuccess] = useState(false);
-  const [alertNotification, setAlertNotification] = useState(null);
-  const [isSoundEnabled, setIsSoundEnabled] = useState(true);
-
-  const isDetectingRef = useRef(false);
 
   // Identify & Train Modal State
   const [isIdentifyModalOpen, setIsIdentifyModalOpen] = useState(false);
@@ -109,42 +91,8 @@ export default function DetectionPage() {
   const [isClearHistoryModalOpen, setIsClearHistoryModalOpen] = useState(false);
   const [isClearingHistory, setIsClearingHistory] = useState(false);
 
-  // Real-time Stats from Database
-  const [stats, setStats] = useState({
-    total_today: 4,
-    household_count: 2,
-    delivery_count: 1,
-    stranger_count: 1,
-    alerts_count: 2,
-  });
-
-  // Active YOLO Bounding Box Detections
-  const [activeDetections, setActiveDetections] = useState([
-    {
-      person_name: "ดร. สมชาย รักสงบ (พ่อ)",
-      category: "household",
-      confidence: 99.4,
-      role: "Family",
-      bounding_box: [160, 60, 480, 520],
-      location: "หน้าประตูหลัก (Main Entrance)",
-    },
-  ]);
-
-  // Camera IP & Stream Configuration State
-  const [cameraIp, setCameraIp] = useState(() => {
-    return localStorage.getItem("esp32_cam_ip") || DEFAULT_IP;
-  });
-  const [streamUrl, setStreamUrl] = useState(() => {
-    return localStorage.getItem("esp32_cam_stream_url") || DEFAULT_STREAM_URL;
-  });
-  const [streamMode, setStreamMode] = useState(() => {
-    return localStorage.getItem("esp32_cam_mode") || "live"; // "live" | "demo"
-  });
-  const [streamStatus, setStreamStatus] = useState("connecting"); // "online" | "offline" | "connecting"
-  const [streamKey, setStreamKey] = useState(() => Date.now()); // for reconnecting/cache busting
+  // Camera Settings Modal State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-
-  // Modal temporary form states
   const parsed = parseStreamUrl(streamUrl);
   const [tempIp, setTempIp] = useState(cameraIp);
   const [tempPort, setTempPort] = useState(parsed.port);
@@ -169,15 +117,8 @@ export default function DetectionPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch Database Stats & Recent Visitors History
-  const fetchStatsAndHistory = async () => {
-    try {
-      const s = await detectionApi.getStats();
-      if (s) setStats(s);
-    } catch (err) {
-      console.warn("Backend stats unavailable, using cached defaults:", err);
-    }
-
+  // Fetch Detection History
+  const fetchHistory = async () => {
     try {
       const h = await detectionApi.getHistory(historyCategory);
       if (h && Array.isArray(h)) {
@@ -207,20 +148,47 @@ export default function DetectionPage() {
     }
   };
 
+  // Helper to refresh both stats and history
+  const fetchStatsAndHistory = async () => {
+    await Promise.all([fetchHistory(), fetchStats()]);
+  };
+
+  // Sync History on Mount and when alerts/history update
+  useEffect(() => {
+    fetchStatsAndHistory();
+    const interval = setInterval(fetchStatsAndHistory, 8000);
+
+    const handleAlertsUpdated = () => {
+      fetchStatsAndHistory();
+    };
+    window.addEventListener("vigil-alerts-updated", handleAlertsUpdated);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("vigil-alerts-updated", handleAlertsUpdated);
+    };
+  }, [historyCategory]);
+
   const handleDeleteHistoryRecord = async () => {
     if (!recordToDelete) return;
     setIsDeletingRecord(true);
     try {
-      const targetId = recordToDelete.rawId || (typeof recordToDelete.id === "string" ? recordToDelete.id.replace("hist-", "") : recordToDelete.id);
+      const targetId =
+        recordToDelete.rawId ||
+        (typeof recordToDelete.id === "string"
+          ? recordToDelete.id.replace("hist-", "")
+          : recordToDelete.id);
       setVisitors((prev) => prev.filter((v) => v.id !== recordToDelete.id));
       await detectionApi.deleteHistory(targetId);
       setIsDeleteRecordModalOpen(false);
       setRecordToDelete(null);
-      await fetchStatsAndHistory();
+      await fetchHistory();
+      await fetchStats();
+      window.dispatchEvent(new CustomEvent("vigil-alerts-updated"));
     } catch (err) {
       console.error("Failed to delete detection record:", err);
       alert("เกิดข้อผิดพลาดในการลบประวัติ: " + (err.response?.data?.detail || err.message));
-      await fetchStatsAndHistory();
+      await fetchHistory();
+      await fetchStats();
     } finally {
       setIsDeletingRecord(false);
     }
@@ -232,21 +200,18 @@ export default function DetectionPage() {
       setVisitors([]);
       await detectionApi.clearHistory(historyCategory !== "ALL" ? historyCategory : undefined);
       setIsClearHistoryModalOpen(false);
-      await fetchStatsAndHistory();
+      await fetchHistory();
+      await fetchStats();
+      window.dispatchEvent(new CustomEvent("vigil-alerts-updated"));
     } catch (err) {
       console.error("Failed to clear detection history:", err);
       alert("เกิดข้อผิดพลาดในการล้างประวัติ: " + (err.response?.data?.detail || err.message));
-      await fetchStatsAndHistory();
+      await fetchHistory();
+      await fetchStats();
     } finally {
       setIsClearingHistory(false);
     }
   };
-
-  useEffect(() => {
-    fetchStatsAndHistory();
-    const interval = setInterval(fetchStatsAndHistory, 10000);
-    return () => clearInterval(interval);
-  }, [historyCategory]);
 
   // Sync modal form when opening
   const handleOpenSettings = () => {
@@ -260,28 +225,14 @@ export default function DetectionPage() {
 
   // Reconnect / refresh stream
   const handleReconnect = () => {
-    setStreamStatus("connecting");
-    setStreamKey(Date.now());
+    reconnectStream();
   };
 
   // Save Settings
   const handleSaveSettings = (e) => {
     if (e) e.preventDefault();
     const newUrl = buildStreamUrl(tempIp, tempPort, tempPath);
-    const cleanIp =
-      tempIp.trim().replace(/^https?:\/\//, "").split("/")[0].split(":")[0] ||
-      DEFAULT_IP;
-
-    setCameraIp(cleanIp);
-    setStreamUrl(newUrl);
-    setStreamMode(tempMode);
-    setStreamStatus(tempMode === "live" ? "connecting" : "online");
-    setStreamKey(Date.now());
-
-    localStorage.setItem("esp32_cam_ip", cleanIp);
-    localStorage.setItem("esp32_cam_stream_url", newUrl);
-    localStorage.setItem("esp32_cam_mode", tempMode);
-
+    updateCameraSettings(tempIp, newUrl, tempMode);
     setIsSettingsOpen(false);
   };
 
@@ -318,161 +269,11 @@ export default function DetectionPage() {
     }, 500);
   };
 
-  // Web Audio API Real-time Alert Chime Synthesizer
-  const playAlertChime = (category) => {
-    if (!isSoundEnabled) return;
-    try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      if (category === "stranger") {
-        // Warning 2-tone alarm for stranger
-        osc.type = "sawtooth";
-        osc.frequency.setValueAtTime(880, now);
-        osc.frequency.setValueAtTime(659.25, now + 0.15);
-        gain.gain.setValueAtTime(0.25, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
-        osc.start(now);
-        osc.stop(now + 0.4);
-      } else if (category === "delivery") {
-        // Double doorbell chime for courier
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(659.25, now);
-        osc.frequency.setValueAtTime(783.99, now + 0.12);
-        gain.gain.setValueAtTime(0.2, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
-        osc.start(now);
-        osc.stop(now + 0.35);
-      } else {
-        // Gentle pleasant chime for household
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(523.25, now);
-        osc.frequency.setValueAtTime(659.25, now + 0.12);
-        gain.gain.setValueAtTime(0.2, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
-        osc.start(now);
-        osc.stop(now + 0.35);
-      }
-    } catch (err) {
-      console.debug("Audio playback waiting for user interaction:", err);
-    }
-  };
-
-  // Trigger Real-time YOLO Detection & Person Classification
+  // Manual Trigger Detection Button
   const handleRunYoloDetection = async () => {
-    if (isDetectingRef.current) return;
-    isDetectingRef.current = true;
-    setIsDetecting(true);
-
-    try {
-      let res = null;
-
-      // 1. Try grabbing the live video frame directly from visible image in browser
-      const streamImg = document.getElementById("esp32-stream-img");
-      if (
-        streamMode === "live" &&
-        streamStatus === "online" &&
-        streamImg &&
-        streamImg.complete &&
-        streamImg.naturalWidth > 0
-      ) {
-        try {
-          const canvas = document.createElement("canvas");
-          canvas.width = streamImg.naturalWidth || 640;
-          canvas.height = streamImg.naturalHeight || 480;
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(streamImg, 0, 0);
-          const blob = await new Promise((resolve) =>
-            canvas.toBlob(resolve, "image/jpeg", 0.88)
-          );
-          if (blob && blob.size > 1000) {
-            const formData = new FormData();
-            formData.append("file", blob, "live_stream_frame.jpg");
-            formData.append("camera_id", `ESP32 (${cameraIp})`);
-            formData.append("location", "หน้าบ้าน (Main Entrance)");
-            res = await detectionApi.detectImage(formData);
-          }
-        } catch (canvasErr) {
-          console.debug("Live stream canvas grab skipped (fallback to API):", canvasErr);
-        }
-      }
-
-      // 2. Fallback to direct backend ESP32 proxy detect if canvas was not used
-      if (!res) {
-        res = await detectionApi.detectESP32({
-          camera_ip: cameraIp,
-          camera_port: tempPort || "",
-          camera_path: "/capture",
-          location: "หน้าบ้าน (Main Entrance)",
-        });
-      }
-
-      if (res && res.detections && res.detections.length > 0) {
-        setActiveDetections(res.detections);
-        const hasStranger = res.detections.some((d) => d.category === "stranger");
-        const hasDelivery = res.detections.some((d) => d.category === "delivery");
-        const primary = res.detections[0];
-
-        const alertCategory = hasStranger ? "stranger" : hasDelivery ? "delivery" : "household";
-        playAlertChime(alertCategory);
-
-        if (hasStranger) {
-          setAlertNotification({
-            type: "warning",
-            title: `⚠️ ตรวจพบคนแปลกหน้า: ${primary.person_name}`,
-            message: `ระบบตรวจจับใบหน้า (${primary.confidence}%) ไม่ตรงกับฐานข้อมูล และได้ส่งแจ้งเตือนความปลอดภัยแล้ว`,
-            isStranger: true,
-            time: new Date().toLocaleTimeString("th-TH"),
-          });
-        } else if (hasDelivery) {
-          setAlertNotification({
-            type: "info",
-            title: `📦 ตรวจพบคนส่งของ: ${primary.person_name}`,
-            message: `ตรวจพบพนักงานขนส่ง/ไรเดอร์ (${primary.confidence}%) มาถึงบริเวณหน้าบ้าน`,
-            isStranger: false,
-            time: new Date().toLocaleTimeString("th-TH"),
-          });
-        } else {
-          setAlertNotification({
-            type: "success",
-            title: `🟢 ยืนยันตัวตน: ${primary.person_name}`,
-            message: `ตรวจพบและจดจำใบหน้าของสมาชิกในบ้าน (${primary.confidence}%) อย่างปลอดภัย`,
-            isStranger: false,
-            time: new Date().toLocaleTimeString("th-TH"),
-          });
-        }
-
-        window.dispatchEvent(new Event("vigil-alerts-updated"));
-        setTimeout(() => setAlertNotification(null), 6000);
-      }
-
-      await fetchStatsAndHistory();
-    } catch (err) {
-      console.error("YOLO Detect error:", err);
-    } finally {
-      isDetectingRef.current = false;
-      setIsDetecting(false);
-    }
+    await runDetection();
+    await fetchHistory();
   };
-
-  // Continuous Auto AI Detect Loop (Non-blocking and never cancels)
-  useEffect(() => {
-    if (!isAutoDetect) return;
-
-    const timer = setInterval(async () => {
-      if (!isDetectingRef.current) {
-        await handleRunYoloDetection();
-      }
-    }, autoDetectInterval);
-
-    return () => clearInterval(timer);
-  }, [isAutoDetect, autoDetectInterval, cameraIp, tempPort, streamMode, streamStatus]);
 
   // Open Identify & Train Modal for a visitor record
   const handleOpenIdentifyModal = async (record) => {
@@ -556,7 +357,8 @@ export default function DetectionPage() {
         )
       );
 
-      await fetchStatsAndHistory();
+      await fetchHistory();
+      await fetchStats();
 
       setTimeout(() => {
         setIsIdentifyModalOpen(false);
@@ -642,7 +444,7 @@ export default function DetectionPage() {
               </button>
             )}
             <button
-              onClick={() => setAlertNotification(null)}
+              onClick={dismissAlert}
               className="text-xs font-bold px-2.5 py-1.5 rounded-lg bg-white/70 hover:bg-white text-[#1a1a1a] cursor-pointer transition-colors"
             >
               ปิด
@@ -736,7 +538,7 @@ export default function DetectionPage() {
                 {/* Auto AI Detect Live Toggle */}
                 <button
                   type="button"
-                  onClick={() => setIsAutoDetect(!isAutoDetect)}
+                  onClick={toggleAutoDetect}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs border ${
                     isAutoDetect
                       ? "bg-[#e8f5e9] text-[#2e7d32] border-[#a5d6a7] hover:bg-[#c8e6c9]"
@@ -752,7 +554,7 @@ export default function DetectionPage() {
                 {/* Sound Alert Toggle */}
                 <button
                   type="button"
-                  onClick={() => setIsSoundEnabled(!isSoundEnabled)}
+                  onClick={toggleSound}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs border ${
                     isSoundEnabled
                       ? "bg-[#e8f5e9] text-[#2e7d32] border-[#a5d6a7] hover:bg-[#c8e6c9]"

@@ -1,3 +1,4 @@
+import os
 import io
 import time
 from datetime import datetime, timezone, date
@@ -311,14 +312,14 @@ async def detect_image(
 async def fetch_esp32_frame(clean_ip: str, port_str: str = "", path_str: str = "/capture") -> Optional[bytes]:
     """
     ดึงภาพ 1 เฟรมจาก ESP32-CAM อย่างชาญฉลาด:
-    1. ลองดึงจาก /capture ด้วย timeout สั้น (2.5 วินาที)
-    2. หาก /capture ไม่ตอบสนอง (เช่น กล้องกำลังสตรีมอยู่) ให้ดึง 1 เฟรมแรกจาก /stream แทนทันที
+    1. ลองดึงจาก /capture ด้วย timeout สั้น (1.5 วินาที)
+    2. หาก /capture ไม่ตอบสนอง ให้ดึง 1 เฟรมแรกจาก /stream แทนทันที (2.0 วินาที)
     """
     target_url = f"http://{clean_ip}{port_str}{path_str}"
 
     # 1. พยายามดึงภาพผ่าน /capture
     try:
-        async with httpx.AsyncClient(timeout=2.5) as client:
+        async with httpx.AsyncClient(timeout=1.5) as client:
             resp = await client.get(target_url)
             if resp.status_code == 200 and len(resp.content) > 500:
                 return resp.content
@@ -328,7 +329,7 @@ async def fetch_esp32_frame(clean_ip: str, port_str: str = "", path_str: str = "
     # 2. Fallback: ดึง 1 เฟรม JPEG จาก /stream ทันที
     stream_url = f"http://{clean_ip}{port_str}/stream"
     try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
+        async with httpx.AsyncClient(timeout=2.0) as client:
             async with client.stream("GET", stream_url) as stream_resp:
                 if stream_resp.status_code == 200:
                     chunks = b""
@@ -361,26 +362,14 @@ async def detect_from_esp32(
     image_bytes = await fetch_esp32_frame(clean_ip, port_str, path_str)
 
     if not image_bytes:
-        # หากกล้องออฟไลน์ในระหว่างทดสอบ ให้จำลองภาพบุคคลทดสอบเพื่อไม่ให้การมอนิเตอร์พัง
-        sample_img_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
-            "data",
-            "snapshots",
+        # หากกล้องออฟไลน์หรือไม่ตอบสนอง คืนค่า 0 detections ปลอดภัยไม่ crash
+        return DetectResultResponse(
+            success=False,
+            camera_id=f"ESP32 ({clean_ip})",
+            timestamp=datetime.now(timezone.utc),
+            detections_count=0,
+            detections=[],
         )
-        sample_files = [os.path.join(sample_img_path, f) for f in os.listdir(sample_img_path) if f.endswith(".jpg")] if os.path.isdir(sample_img_path) else []
-        if sample_files:
-            try:
-                with open(sample_files[0], "rb") as sf:
-                    image_bytes = sf.read()
-            except Exception:
-                pass
-
-        if not image_bytes:
-            # Fallback black frame
-            img = Image.new("RGB", (640, 480), color=(30, 30, 35))
-            buf = io.BytesIO()
-            img.save(buf, format="JPEG")
-            image_bytes = buf.getvalue()
 
     image_np = bytes_to_image(image_bytes)
     if image_np is None:

@@ -169,7 +169,7 @@ Interactive Swagger UI: `http://localhost:8000/docs`
 
 ### 4.2 ระบบตรวจจับและประวัติ (Detection & History)
 
-#### ตรวจจับภาพสดจาก ESP32-CAM
+#### ตรวจจับภาพสดจาก ESP32-CAM (Backend Frame Grab & Proxy)
 - `POST /api/v1/detection/detect-esp32`
 - Request Body:
   ```json
@@ -180,6 +180,10 @@ Interactive Swagger UI: `http://localhost:8000/docs`
     "location": "Main Entrance"
   }
   ```
+- **พฤติกรรมและความทนทาน (Resilience):**
+  - พยายามดึงเฟรมจาก `http://{ip}/capture` (Timeout 1.5 วินาที)
+  - หาก `/capture` ไม่สำเร็จ จะพยายามดึงจาก MJPEG stream `http://{ip}/stream` (Timeout 2.0 วินาที)
+  - หากกล้องปิดอยู่ ไม่ตอบสนอง หรือติดขัด ระบบจะไม่ระเบิด HTTP 500 (`import os` safe) แต่จะตอบกลับ `200 OK` พร้อม `{"success": false, "message": "ESP32 Camera unreachable ...", "detections": []}` เพื่อให้ฝั่ง Frontend ทำงานต่อเนื่องได้อย่างราบรื่น
 - Response `200 OK`: ผลการตรวจจับ รายชื่อบุคคล ค่าความมั่นใจ และการสร้าง Alert
 
 #### ตรวจจับจากไฟล์ภาพ / Canvas Frame

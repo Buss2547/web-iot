@@ -64,23 +64,38 @@ flowchart TD
 sequenceDiagram
     autonumber
     actor User as ผู้ใช้งาน / Operator
-    participant FE as React Frontend
+    participant FE as React Frontend (DetectionContext)
     participant BE as FastAPI Backend
     participant AI as YOLO + MobileNetV3
     participant DB as SQLite (vigil.db)
     participant CAM as ESP32-S3 Camera
 
-    FE->>CAM: ขอสตรีมภาพสด (Direct Stream)
-    Note over FE,CAM: มอนิเตอร์วิดีโอเรียลไทม์ 25-30 FPS
-    
-    loop วงรอบการตรวจจับอัตโนมัติ (Continuous Auto-Detection)
-        FE->>FE: Canvas Capture เฟรมปัจจุบันจากหน้าจอ
+    alt ผู้ใช้อยู่ในหน้า /detection
+        FE->>CAM: ขอสตรีมภาพสดผ่านแท็กหลัก (Direct Stream)
+        Note over FE,CAM: มอนิเตอร์วิดีโอเรียลไทม์ 25-30 FPS
+        FE->>FE: Canvas Capture จาก #esp32-stream-img
         FE->>BE: POST /api/v1/detection/detect-image (JPEG Blob)
-        BE->>AI: ตรวจจับวัตถุคน + สกัด Face Embedding 576-dim
-        AI-->>BE: พิกัด Bounding Box + ค่า Similarity + กลุ่มบุคคล
-        BE->>DB: บันทึก detection_history + สร้าง alert (กรณีตรวจพบ)
-        BE-->>FE: ส่งผลลัพธ์กลับ (Bounding Box, Confidence, Category)
-        FE->>FE: วาดกรอบสีตามกลุ่ม + เล่นเสียงแจ้งเตือน (Web Audio API)
+    else ผู้ใช้อยู่หน้าอื่น (/history, /alerts, /training, /add-person)
+        Note over FE: DetectionContext ทำงานเบื้องหลังต่อเนื่อง 24/7
+        FE->>FE: Canvas Capture จาก #vigil-persistent-stream-img (Persistent Hidden Stream)
+        alt Canvas Capture สำเร็จ
+            FE->>BE: POST /api/v1/detection/detect-image (JPEG Blob)
+        else Fallback เมื่อ Canvas ไม่พร้อม
+            FE->>BE: POST /api/v1/detection/detect-esp32 (Proxy Grab)
+            BE->>CAM: GET /capture หรือ /stream (ผ่าน LAN)
+            CAM-->>BE: Frame Data
+        end
+    end
+    
+    BE->>AI: ตรวจจับวัตถุคน + สกัด Face Embedding 576-dim
+    AI-->>BE: พิกัด Bounding Box + ค่า Similarity + กลุ่มบุคคล
+    BE->>DB: บันทึก detection_history + สร้าง alert (กรณีตรวจพบ)
+    BE-->>FE: ส่งผลลัพธ์กลับ (Bounding Box, Confidence, Category)
+    
+    par การตอบสนองทันทีบนหน้าเว็บ (Dual-Trigger Alerting)
+        FE->>FE: Trigger 1 (Direct Detection): เล่นเสียง Chime ทันที + แสดง GlobalAlertToast
+        FE->>DB: Trigger 2 (Background Sync): ทุก 4s เช็ค Unread Alerts จาก SQLite
+        FE->>FE: ยิง Event 'vigil-alerts-updated' เพื่ออัปเดตตัวเลขแจ้งเตือนบน Navbar
     end
 
     opt เมื่อต้องการเทรนบุคคลใหม่
